@@ -19,8 +19,8 @@ cert_template:
   st: "State of Cluster"
   c: "MyCountry"
 
-#image: "docker.io/tremolosecurity/openunison-k8s-login-activedirectory:latest"
-image: docker.lab.tremolo.dev/lab/ou-k8s
+image: "docker.io/tremolosecurity/openunison-k8s-login-activedirectory:latest"
+#image: docker.lab.tremolo.dev/lab/ou-k8s
 myvd_config_path: "WEB-INF/myvd.conf"
 k8s_cluster_name: kubernetes
 enable_impersonation: false
@@ -74,13 +74,13 @@ services:
   token_request_expiration_seconds: 600
   node_selectors: []
   liveness_probe:
-  - /usr/local/openunison/bin/check_alive.sh
+  - /usr/local/openunison/bin/check_alive.py
   - https://127.0.0.1:8443/auth/idp/k8sIdp/.well-known/openid-configuration
   - issuer
   - https://127.0.0.1:8443/check_alive
   - Anonymous
   readiness_probe:
-  - /usr/local/openunison/bin/check_alive.sh
+  - /usr/local/openunison/bin/check_alive.py
   - https://127.0.0.1:8443/auth/idp/k8sIdp/.well-known/openid-configuration
   - issuer
   - https://127.0.0.1:8443/check_alive
