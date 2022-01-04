@@ -1,7 +1,7 @@
 network:
-  openunison_host: "k8sou.192-168-2-114.nip.io"
-  dashboard_host: "k8sdb.192-168-2-114.nip.io"
-  api_server_host: "k8sapi.192-168-2-114.nip.io"
+  openunison_host: "k8sou.192-168-57-21.nip.io"
+  dashboard_host: "k8sdb.192-168-57-21.nip.io"
+  api_server_host: "k8sapi.192-168-57-21.nip.io"
   session_inactivity_timeout_seconds: 900
   k8s_url: https://0.0.0.0:6443
   force_redirect_to_tls: false
@@ -11,7 +11,6 @@ network:
     kubernetes.io/ingress.class: nginx
   
 
-
 cert_template:
   ou: "Kubernetes"
   o: "MyOrg"
@@ -19,15 +18,15 @@ cert_template:
   st: "State of Cluster"
   c: "MyCountry"
 
-image: "docker.io/tremolosecurity/openunison-k8s-login-activedirectory:latest"
-#image: docker.lab.tremolo.dev/lab/ou-k8s
+
+image: docker.io/tremolosecurity/openunison-k8s
 myvd_config_path: "WEB-INF/myvd.conf"
 k8s_cluster_name: kubernetes
 enable_impersonation: false
 
 impersonation:
   use_jetstack: true
-  jetstack_oidc_proxy_image: quay.io/jetstack/kube-oidc-proxy:v0.3.0
+  jetstack_oidc_proxy_image: docker.io/tremolosecurity/kube-oidc-proxy:latest
   explicit_certificate_trust: true
 
 dashboard:
@@ -42,8 +41,11 @@ trusted_certs:
   - name: ldaps
     pem_b64: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURlekNDQW1PZ0F3SUJBZ0lFR2owUUZ6QU5CZ2txaGtpRzl3MEJBUXNGQURCdE1Rd3dDZ1lEVlFRR0V3TmsKWlhZeEREQUtCZ05WQkFnVEEyUmxkakVNTUFvR0ExVUVCeE1EWkdWMk1Rd3dDZ1lEVlFRS0V3TmtaWFl4RERBSwpCZ05WQkFzVEEyUmxkakVsTUNNR0ExVUVBeE1jWVhCaFkyaGxaSE11WVdOMGFYWmxaR2x5WldOMGIzSjVMbk4yCll6QWdGdzB5TVRBM01EVXdNRFV6TWpoYUdBOHlNVEl4TURZeE1UQXdOVE15T0Zvd2JURU1NQW9HQTFVRUJoTUQKWkdWMk1Rd3dDZ1lEVlFRSUV3TmtaWFl4RERBS0JnTlZCQWNUQTJSbGRqRU1NQW9HQTFVRUNoTURaR1YyTVF3dwpDZ1lEVlFRTEV3TmtaWFl4SlRBakJnTlZCQU1USEdGd1lXTm9aV1J6TG1GamRHbDJaV1JwY21WamRHOXllUzV6CmRtTXdnZ0VpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElCRHdBd2dnRUtBb0lCQVFDNlNVQUJRSUZkYnRwZGJ3WEEKT05ablJVQlFBMEVyK2hWYmkxUHNWSnNaaUlGZjhJRC8xZXBPN0M4QlViVXN1U3dWWkc5ZEJIV3o0RFBwWUUrKwp2dmxrTEs1cEdiTnJQbDdFd241clJLRE5PeVR5ZUNBcFMzSVNsRW1iaVNQUjBuYXd5ckpoNjhQQ0I1bURSNTNmCmh1bFhPQ0dTd3ZNN2RwM2RPc3lFQmRlVkw3aTFnbkJNYi9wN05YdTN5WmlWaDlpS3pqaENrZndqL0VsNTZaUHEKYmsvOGtQN0xBdTFvZGJWTkZGSUx5clB6SFBFU3I3N0preHcvKytPTmhtblA2UFBiU3FtRm0rcUVEYWhQanBFZgpscUdaY3BsOEZ0VXBzTG5JK3B4blI5eWU5ZUNpVDVuaDhlTEhobkVFNzFpVE1rb2xrSHdxSm5xV1R3ZlF2b1g5CkM2SERBZ01CQUFHaklUQWZNQjBHQTFVZERnUVdCQlRjOGlDU055NnhSM2M5OU1aYkZUODgzREs1V0RBTkJna3EKaGtpRzl3MEJBUXNGQUFPQ0FRRUFOMEkwZnJDSzdYNGRHRmpGLzFpb3czUUwvbTcwemVIemlQVVFFUUdONXBFMwpyMlZZL0ZHWGdNV0tFSXpHa2hMZW5CUXRxRE5Pbm4vL1JjK0Y2anM1RkNOVXhaT2V4ekl2aElhY0M4YUhzRWpFClRnclI5OWNqUVdsdzFhSVF0YUhkSmVqYXdYcU50YU1FMSt4RlJBQTNCWUF1T3BveW9wQ0NoMXdJaTEvQk84TlQKVmFaancxQU8xd1ZUaTJ3SUtCSUp1Z0N2T0dYZEt3YzBuL0I4bzRRQkpScklRZEJnbzJVNjFBbkMxaWM4b0d3RwpxekN1V0dDenZjam9xNWFNcTliS0YyNHBQaDR3cWZMZnZGdWNsYmFIUlBiSmpxT3l0V3gzczhNV0lvRUNzdlhLCnhIYmJvSnU0c1AwLzRBMGQ4K25OOXI1MU8xalFaWHd0b3hwenFTV2ZlZz09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0=
 
+
 monitoring:
   prometheus_service_account: system:serviceaccount:monitoring:prometheus-k8s
+
+# Uncomment one of the below options for authentication
 
 active_directory:
   base: DC=domain,DC=com
@@ -52,6 +54,38 @@ active_directory:
   bind_dn: "cn=ou_svc_account,ou=Users,DC=domain,DC=com"
   con_type: ldaps
   srv_dns: "false"
+
+
+
+#active_directory:
+#  base: cn=users,dc=ent2k12,dc=domain,dc=com
+#  host: "192.168.2.75"
+#  port: "636"
+#  bind_dn: "cn=Administrator,cn=users,dc=ent2k12,dc=domain,dc=com"
+#  con_type: ldaps
+#  srv_dns: "false"
+
+#oidc:
+#  client_id: xxxxxx
+#  issuer: https://xxxxxx.okta.com/
+#  user_in_idtoken: false
+#  domain: ""
+#  scopes: openid email profile groups
+#  claims:
+#    sub: sub
+#    email: email
+#    given_name: given_name
+#    family_name: family_name
+#    display_name: name
+#    groups: groups
+
+#github:
+#  client_id: d85d77c55a08c9bcbb15
+#  teams: TremoloSecurity/
+
+#saml:
+#  idp_url: "https://portal.apps.tremolo.io/idp-test/metadata/dfbe4040-cd32-470e-a9b6-809c8f857c40"
+
        
 network_policies:
   enabled: false
@@ -73,27 +107,36 @@ services:
   token_request_audience: api
   token_request_expiration_seconds: 600
   node_selectors: []
-  liveness_probe:
-  - /usr/local/openunison/bin/check_alive.sh
-  - https://127.0.0.1:8443/auth/idp/k8sIdp/.well-known/openid-configuration
-  - issuer
-  - https://127.0.0.1:8443/check_alive
-  - Anonymous
-  readiness_probe:
-  - /usr/local/openunison/bin/check_alive.sh
-  - https://127.0.0.1:8443/auth/idp/k8sIdp/.well-known/openid-configuration
-  - issuer
-  - https://127.0.0.1:8443/check_alive
-  - Anonymous
   
 openunison:
   replicas: 1
   non_secret_data:
     K8S_DB_SSO: oidc
+    PROMETHEUS_SERVICE_ACCOUNT: system:serviceaccount:monitoring:prometheus-k8s
+    SHOW_PORTAL_ORGS: "false"
   secrets: []
   html:
     image: docker.io/tremolosecurity/openunison-k8s-html
-    # image: docker.lab.tremolo.dev/nginx
   enable_provisioning: false
+  #az_groups:
+  #- CN=k8s-users,CN=Users,DC=ent2k12,DC=domain,DC=com
 
 myvd_configmap: myvd-book
+#myvd_configmap: myvdconfig
+
+# For Namespace as a Service
+
+#database:
+#  hibernate_dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+#  quartz_dialect: org.quartz.impl.jdbcjobstore.StdJDBCDelegate
+#  driver: com.mysql.jdbc.Driver
+#  url: jdbc:mysql://mariadb.mariadb.svc.cluster.local:3306/unison
+#  user: unison
+#  validation: SELECT 1
+
+#smtp:
+#  host: blackhole.blackhole.svc.cluster.local
+#  port: 1025
+#  user: "none"
+#  from: donotreply@domain.com
+#  tls: false
