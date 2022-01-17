@@ -23,4 +23,24 @@ kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/
 For this chapter, I took them and tweaked them a bit. Let's deploy them, and then recreate all our pods so that they have our "sane defaults" in place before rolling out our constraint implementations:
 ```bash
 kubectl create -f chapter9/default_mutations.yaml
+sh chapter9/delete_all_pods_except_gatekeeper.sh
+```
+With our pods deleted and recreated, we can check to see whether the pods running in the openunison namespace have a default securityContext configuration:
+
+```bash
+kubectl get pod -o jsonpath='{$.items[0].spec.containers[0].securityContext}' -l app=openunison-operator -n openunison | jq -r
+```
+
+#### Enforcing cluster policies
+```bash
+kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper-library/master/library/pod-security-policy/allow-privilege-esca
+lation/template.yaml
+kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper-library/master/library/pod-security-policy/forbidden-sysctls/template.yaml
+kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper-library/master/library/pod-security-policy/host-filesystem/template.yaml
+kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper-library/master/library/pod-security-policy/host-namespaces/template.yaml
+kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper-library/master/library/pod-security-policy/host-network-ports/template.yaml
+kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper-library/master/library/pod-security-policy/privileged-containers/template.yaml
+kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper-library/master/library/pod-security-policy/proc-mount/template.yaml
+kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper-library/master/library/pod-security-policy/users/template.yaml 
+kubectl apply -f chapter9/minimal_gatekeeper_constraints.yaml
 ```
