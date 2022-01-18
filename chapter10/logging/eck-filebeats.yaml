@@ -5,7 +5,7 @@ metadata:
   namespace: logging
 spec:
   type: filebeat
-  version: 7.14.0
+  version: 7.16.3
   elasticsearchRef:
     name: elasticsearch
   kibanaRef:
@@ -102,7 +102,7 @@ metadata:
   name: elasticsearch
   namespace: logging
 spec:
-  version: 7.14.0
+  version: 7.16.3
   nodeSets:
   - name: logging
     count: 1
@@ -115,7 +115,7 @@ metadata:
   name: kibana
   namespace: logging
 spec:
-  version: 7.14.0
+  version: 7.16.3
   count: 1
   elasticsearchRef:
     name: elasticsearch
