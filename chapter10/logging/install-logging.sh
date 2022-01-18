@@ -19,8 +19,8 @@ echo -e "\n*********************************************************************
 echo -e "Installing the ECK CRDs and Operator"
 echo -e "*******************************************************************************************************************"
 tput setaf 2
-kubectl create -f https://download.elastic.co/downloads/eck/1.7.0/crds.yaml
-kubectl apply -f https://download.elastic.co/downloads/eck/1.7.0/operator.yaml
+kubectl create -f https://download.elastic.co/downloads/eck/1.9.1/crds.yaml
+kubectl apply -f https://download.elastic.co/downloads/eck/1.9.1/operator.yaml
 
 tput setaf 5
 echo -e "\n*******************************************************************************************************************"
