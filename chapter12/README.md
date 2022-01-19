@@ -50,5 +50,14 @@ Then run the istioctl verify-install command.
 istioctl verify-install -f istio-kind.yaml
 ```
 
-With Istio deployed, our next step is to expose it to our network so we can access the applications we'll build. Since we're running on KinD this can be tricky. Docker is forwarding all traffic from port ***80*** (HTTP) and ***443*** (HTTPS) on our KinD server to the worker node. The worker node is in turn running the NGINX Ingress controller on ports ***443*** and ***80*** to receive that traffic. In a real-world scenario, we'd use an external load balancer, like MetalLB, to expose the individual services via a ***LoadBalancer***. For our labs though, we're going to instead focus on simplicity. We created a script in the ***chapter12*** directory called ***expose_istio.sh*** that will do two things. First, it will delete the ***ingress-nginx*** namespace, removing NGINX and freeing up ports 80 and 443 on the Docker host. Second, it will patch the ***istio-ingressgateway*** Deployment in the ***istio-system*** namespace so that it runs on ports ***80*** and ***443*** on the worker node.
+With Istio deployed, our next step is to expose it to our network so we can access the applications we'll build. Since we're running on KinD this can be tricky. Docker is forwarding all traffic from port ***80*** (HTTP) and ***443*** (HTTPS) on our KinD server to the worker node. The worker node is in turn running the NGINX Ingress controller on ports ***443*** and ***80*** to receive that traffic. 
+
+In a real-world scenario, we'd use an external load balancer, like MetalLB, to expose the individual services via a ***LoadBalancer***. 
+
+For our labs though, we're going to instead focus on simplicity. 
+We created a script in the ***chapter12*** directory called ***expose_istio.sh*** that will do two things. 
+
+First, it will delete the ***ingress-nginx*** namespace, removing NGINX and freeing up ports 80 and 443 on the Docker host. 
+
+Second, it will patch the ***istio-ingressgateway*** Deployment in the ***istio-system*** namespace so that it runs on ports ***80*** and ***443*** on the worker node.
 
