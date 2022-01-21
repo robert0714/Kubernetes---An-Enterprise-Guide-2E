@@ -9,6 +9,8 @@ export PATH="$PATH:$PWD/istio-1.10.6/bin"
 istioctl manifest install --set profile=demo
 istioctl manifest generate --set profile=demo > istio-kind.yaml
 istioctl verify-install -f istio-kind.yaml
+kubectl apply -f ./chpater12/prometheus-deployment.yaml
+kubectl apply -f ./chpater12/jaeger-deployment.yaml
 helm install --namespace istio-system --set auth.strategy="anonymous" --repo https://kiali.org/helm-charts kiali-server kiali-server 
 ./chpater12/expose_istio.sh
 ```
