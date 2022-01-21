@@ -395,7 +395,7 @@ Earlier in the chapter we said we couldn't leak a token we didn't have, so we sh
 With our example check-writing service deployed, let's run it and work backward. Just like with our earlier examples, we'll use ***curl*** to get the token and call our service. In ***chapter13/write-checks***, run ***call_service.sh***:
 ```bash
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token')
+export JWT=$(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token')
 curl -v  -H "Authorization: Bearer $JWT" http://write-checks.$hostip.nip.io/write-check
 curl -v  -H "Authorization: Bearer $JWT" http://write-checks.$hostip.nip.io/write-check  2>/dev/null  | jq -r
 ```
@@ -415,10 +415,58 @@ the ouput is :
 }
 ```
 
-
 The output you see is the result of the calls to /write-check, which then calls /check-funds and /pull-funds. Let's walk through each call, the tokens that are generated, and the code that generates them.
 
 ##### Using Impersonation
+We're not talking about the same Impersonation you used in Chapter 5, Integrating Authentication into Your Cluster. It's a similar concept, but this is specific to token exchange. When /write-check needs to get a token to call /check-funds, it asks OpenUnison for a token on behalf of our user, mmosley. The important aspect of Impersonation is that there's no reference to the requesting client in the generated token. The /check-funds service has no knowledge that the token it's received wasn't retrieved by the user themselves. Working backward, the impersonated_jwt in the response to our service call is what /write-check used to call /check-funds. Here's the payload after dropping the result into jwt.io:
+```json
+{
+  "iss": "https://k8sou.192-168-2-119.nip.io/auth/idp/service-idp",
+  "aud": "checkfunds",
+  "exp": 1631497059,
+  "jti": "C8Qh8iY9FJdFzEO3pLRQzw",
+  "iat": 1631496999,
+  "nbf": 1631496879,
+  "nonce": "bec42c16-5570-4bd8-9038-be30fd216016",
+  "sub": "mmosley",
+  "name": " Mosley",
+  "groups": [
+    "cn=group2,ou=Groups,DC=domain,DC=com",
+    "cn=k8s-cluster-admins,ou=Groups,DC=domain,DC=com"
+  ],
+  "preferred_username": "mmosley",
+  "email": "mmosley@tremolo.dev",
+  "amr": [
+    "pwd"
+  ]
+}
+```
+
+The two important fields here are sub and aud. The sub field tells /check-funds who the user is and the aud field tells Istio which services can consume this token. Compare this to the payload from the original token in the user_jwt response:
+```json
+{
+  "iss": "https://k8sou.192-168-2-119.nip.io/auth/idp/service-idp",
+  "aud": "users",
+  "exp": 1631497059,
+  "jti": "C8Qh8iY9FJdFzEO3pLRQzw",
+  "iat": 1631496999,
+  "nbf": 1631496879,
+  "sub": "mmosley",
+  "name": " Mosley",
+  "groups": [
+    "cn=group2,ou=Groups,DC=domain,DC=com",
+    "cn=k8s-cluster-admins,ou=Groups,DC=domain,DC=com"
+  ],
+  "preferred_username": "mmosley",
+  "email": "mmosley@tremolo.dev",
+  "amr": [
+    "pwd"
+  ]
+}
+```
+The original sub is the same, but the aud is different. The original aud is for users while the impersonated aud is for checkfunds. This is what differentiates the impersonated token from the original one. While our Istio deployment is configured to accept both audiences for the same service, that's not a guarantee in most production clusters. When we call /check-funds, you'll see that in the output we echo the user of our token, mmosley.
+
+Now that we've seen the end product, let's see how we get it. First, we get the original JWT that was used to call /write-check:
 
 #### Passing tokens between services
 #### Using simple impersonation

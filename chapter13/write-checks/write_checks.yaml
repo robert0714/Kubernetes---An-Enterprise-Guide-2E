@@ -18,6 +18,8 @@ data:
     flask
     pyjwt
     requests
+    elastic-apm[flask]
+    psutil
   startup.sh: |-
     #!/bin/bash
 
@@ -35,8 +37,20 @@ data:
     from pathlib import Path
     import requests
     import base64
-
+    import requests
+    from elasticapm.contrib.flask import ElasticAPM
+    
     app = Flask(__name__)
+    
+    '''
+    https://www.elastic.co/guide/en/apm/agent/python/current/configuration.html#config-transactions-ignore-patterns
+    '''
+    app.config['ELASTIC_APM'] = {
+        'ENABLED': 'false',
+        'SERVER_URL': 'http://apm.elastic-apm.svc.cluster.local:8200',
+    }
+
+    apm = ElasticAPM(app)
 
     @app.route('/headers')
     def return_headers():
@@ -226,6 +240,13 @@ spec:
           httpGet:
             path: /health-check
             port: 8080
+        env:
+          - name: TZ
+            value: 'Asia/Taipei'
+          - name: ELASTIC_APM_ENABLED
+            value: 'true'
+          - name: ELASTIC_APM_SERVER_URL
+            value: 'http://localhost:8200'
       volumes:
       - name: sources
         configMap:
