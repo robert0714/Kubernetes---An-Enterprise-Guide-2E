@@ -51,7 +51,6 @@ data:
     '''
     app.config['ELASTIC_APM'] = {
         'SERVICE_NAME': 'ch13-write-checks',
-        'SECRET_TOKEN': 'changeme',
         'ENABLED': 'false',
         'SERVER_URL': 'http://apm.elastic-apm.svc.cluster.local:8200',
     }
@@ -229,7 +228,7 @@ spec:
         app: write-checks
     spec:
       containers:
-      - image: python:buster
+      - image: python:3.9.10-buster
         name: python
         volumeMounts:
           - mountPath: /src
