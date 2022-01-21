@@ -41,8 +41,6 @@ data:
     import base64
     import requests
     from elasticapm.contrib.flask import ElasticAPM
-    import requests.packages.urllib3
-    requests.packages.urllib3.disable_warnings()
 
     app = Flask(__name__)
 
@@ -251,7 +249,7 @@ spec:
           - name: ELASTIC_APM_ENABLED
             value: 'true'
           - name: ELASTIC_APM_SERVER_URL
-            value: 'http://localhost:8200'
+            value: 'http://192.168.57.12:8200'
       volumes:
       - name: sources
         configMap:
