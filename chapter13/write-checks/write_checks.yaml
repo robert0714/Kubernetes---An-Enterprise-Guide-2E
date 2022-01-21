@@ -23,6 +23,8 @@ data:
   startup.sh: |-
     #!/bin/bash
 
+    python3 -m pip install --upgrade pip
+
     pip3 install -r /src/requirements.txt
 
     echo "Starting python service..."
@@ -39,13 +41,17 @@ data:
     import base64
     import requests
     from elasticapm.contrib.flask import ElasticAPM
-    
+    import requests.packages.urllib3
+    requests.packages.urllib3.disable_warnings()
+
     app = Flask(__name__)
-    
+
     '''
     https://www.elastic.co/guide/en/apm/agent/python/current/configuration.html#config-transactions-ignore-patterns
     '''
     app.config['ELASTIC_APM'] = {
+        'SERVICE_NAME': 'ch13-write-checks',
+        'SECRET_TOKEN': 'changeme',
         'ENABLED': 'false',
         'SERVER_URL': 'http://apm.elastic-apm.svc.cluster.local:8200',
     }
