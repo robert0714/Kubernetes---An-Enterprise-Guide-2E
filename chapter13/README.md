@@ -493,7 +493,7 @@ export JWT=$(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/
 curl -v  -H "Authorization: Bearer $JWT" http://write-checks.$hostip.nip.io/write-check
 curl -v  -H "Authorization: Bearer $JWT" http://write-checks.$hostip.nip.io/write-check  2>/dev/null  | jq -r
 ```
-the ouput is :
+If istio sucessfully authenticate the JWT  the ouput is :
 ```json
 {
   "msg": "hello world!",
@@ -507,6 +507,10 @@ the ouput is :
   "delegation_token": "...",
   "pull_funds_text": "{\"funds_pulled\": true, \"user\": \"mmosley\", \"actor\": \"system:serviceaccount:write-checks:default\"}"
 }
+```
+If it failed , the ouput is :
+```bash
+Jwt issuer is not configured
 ```
 
 The output you see is the result of the calls to /write-check, which then calls /check-funds and /pull-funds. Let's walk through each call, the tokens that are generated, and the code that generates them.
