@@ -247,7 +247,7 @@ spec:
         app: write-checks
     spec:
       containers:
-      - image: python:3.9.10-buster
+      - image: python:buster
         name: python
         volumeMounts:
           - mountPath: /src
@@ -268,7 +268,7 @@ spec:
           - name: TZ
             value: 'Asia/Taipei'
           - name: ELASTIC_APM_ENABLED
-            value: 'true'
+            value: 'false'
           - name: ELASTIC_APM_SERVER_URL
             value: 'http://192.168.18.24:8200'
       volumes:

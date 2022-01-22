@@ -3,16 +3,16 @@
 
 ```bash
 ./chapter2/create-cluster.sh
-export ISTIO_VERSION=1.10.6
+export ISTIO_VERSION=1.11.5
 curl -L https://istio.io/downloadIstio | sh -
-export PATH="$PATH:$PWD/istio-1.10.6/bin"
+export PATH="$PATH:$PWD/istio-$ISTIO_VERSION/bin"
 istioctl manifest install --set profile=demo
 istioctl manifest generate --set profile=demo > istio-kind.yaml
 istioctl verify-install -f istio-kind.yaml
-kubectl apply -f ./chpater12/prometheus-deployment.yaml
-kubectl apply -f ./chpater12/jaeger-deployment.yaml
+kubectl apply -f ./chapter12/prometheus-deployment.yaml
+kubectl apply -f ./chapter12/jaeger-deployment.yaml
 helm install --namespace istio-system --set auth.strategy="anonymous" --repo https://kiali.org/helm-charts kiali-server kiali-server 
-./chpater12/expose_istio.sh
+./chapter12/expose_istio.sh
 ```
 
 ## Deploying a monolith
@@ -135,6 +135,7 @@ helm install orchestra-token-api token-login -n openunison -f /tmp/openunison-va
 
 This will give us a way to easily generate a JWT from our internal "Active Directory". Next, we'll deploy the actual policy objects. Go into the ***chapter13/authentication*** directory and run ***deploy-auth.sh***. It will look like:
 ```bash
+cd chapter13/authentication
 ./deploy-auth.sh
 ```
 There are two objects that are created. The first is the ***RequestAuthentication*** object and then a simple ***AuthorizationPolicy***. First, we will walk through ***RequestAuthentication***:
@@ -226,7 +227,7 @@ curl -v http://service.$hostip.nip.io/
 We see that the request was denied with a 403 HTTP code. We received 403 because Istio was expecting a JWT but there wasn't one. Next, let's generate a valid token the same way we did in ***Chapter 5, Integrating Authentication into Your Cluster***:
 ```bash
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-curl -H "Authorization: Bearer $(curl -H "Authorization: Bearer $(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token')"  http://service.$hostip.nip.io/
+curl -H "Authorization: Bearer $(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token')"  http://service.$hostip.nip.io/
 ```
 Now a success! Our hello world service now requires proper authentication. Next, we'll update our authorization to require a specific group from Active Directory.
 
@@ -458,7 +459,7 @@ We're not going to go into the details of OpenUnison's configuration. Suffice to
 
 ```bash
 cd write-checks/
-./deploy_write_checks.sh`
+./deploy_write_checks.sh
 ```
 This should look pretty familiar after the first set of examples in this chapter. We deployed our service as Python in a ConfigMap and the same Istio objects we created in the previous service. The only major difference is in our RequestAuthentication object:
 ```yaml
