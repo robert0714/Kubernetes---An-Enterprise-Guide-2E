@@ -23,8 +23,66 @@ cd chapter13
 ```
 ### Exposing our monolith outside our cluster
 ### Configuring sticky sessions
+Most monolithic applications require sticky sessions. Enabling sticky sessions means that every request in a session is sent to the same pod. This is generally not needed in microservices because each API call is distinct. Web applications that users interact with generally need to manage state, usually via cookies. Those cookies don't generally store all of the session's state though because the cookies would get too big and would likely have sensitive information. Instead, most web applications use a cookie that points to a session that's saved on the server, usually in memory. While there are ways to make sure this session is available to any instance of the application in a highly available way, it's not very common to do so. These systems are expensive to maintain and are generally not worth the work.
+
+OpenUnison is no different than most other web applications and needs to make sure that sessions are sticky to the pod they originated from. To tell Istio how we want sessions to be managed, we use ***DestinationRule***. ***DestinationRule*** objects tell Istio what to do about traffic routed to a host by a ***VirtualService***. Here's the important parts of ours:
+
+```yaml
+spec:
+  host: openunison-orchestra
+  trafficPolicy:
+    loadBalancer:
+      consistentHash:
+        httpCookie:
+          name: openunison-orchestra
+          path: /
+          ttl: 0s
+    tls:
+      mode: ISTIO_MUTUAL
+```
+
+The ***host*** in the rule refers to the target (***Service***) of the traffic, not the hostname in the original URL. ***trafficPolicy.loadBalancer.consistentHash*** tells Istio how we want to manage stickiness. Most monolithic applications will want to use cookies. ***ttl*** is set to ***0s*** so the cookie is considered a "session cookie." This means that when the browser is closed the cookie disappears from its cookie jar.
+
+> **⚠ ATTENTION:**  
+> You should avoid cookies with specific times to live. These cookies are persisted by the browser and can be treated as a security risk by your enterprise.
+
+With OpenUnison up and running and understanding how Istio is integrated, let's take a look at what Kiali will tell us about our monolith.
+
 ### Integrating Kiali and OpenUnison
+First, let's integrate OpenUnison and Kiali. Kiali, like any other cluster management system, should be configured to require access. Kiali, just like the Kubernetes Dashboard, can integrate with Impersonation so that Kiali will interact with the API server using the user's own permissions. Doing this is pretty straight forward. We created a script in the ***chapter13*** folder called ***integrate-kiali-openunison.sh*** that:
+```bash
+cd chapter13
+./integrate-kiali-openunison.sh
+```
+
+1. Deletes the old ***Gateway*** and ***VirtualService*** for Kiali
+1. Updates the Kiali Helm Chart to use ***header*** for ***auth.strategy*** and restarts Kiali to pick up the changes
+1. Deploys the openunison-kiali Helm Chart that configures OpenUnison to integrate with Kiali and adds a "badge" to the main screen of our portal
+The integration works the same way as the dashboard, but if you're interested in the details you can read about them at https://openunison.github.io/applications/kiali/.
+
+With the integration completed, let's see what Kiali can tell us about our monolith.
+
+Next, click on the Kiali badge to open Kiali, then click on Graphs, and choose the openunison namespace. 
+
+You can now view the connections between OpenUnison, apacheds, and other containers the same way you would with a microservice! Speaking of which, now that we've learned how to integrate a monolith into Istio, let's build a microservice and learn how it integrates with Istio.
+
 ## Building a microservice
+
+We spent quite a bit of time talking about monoliths. First, we discussed which is the best approach for you, then we spent some time showing how to deploy a monolith into Istio to get many of the benefits from it that microservices do. Now, let's dive into building and deploying a microservice. Our microservice will be pretty simple. The goal is to show how a microservice is built and integrated into an application, rather than how to build a full-fledged application based on microservices. Our book is focused on enterprise so we're going to focus on a service that:
+
+1. Requires authentication from a specific user
+1. Requires authorization for a specific user based on a group membership or attribute
+1. Does something very ***important***
+1. Generates some log data about what happened
+
+This is common in enterprise applications and the services they're built on. Most enterprises need to be able to associate actions, or decisions, to a particular person in that organization. If an order is placed, who placed it? If a case is closed, who closed it? If a check is cut, who cut it? There are of course many instances where a user isn't responsible for an action. Sometimes it's another service that is automated. A batch service that pulls in data to create a warehouse isn't associated with a particular person. This is an ***interactive*** service, meaning that an end user is expected to interact with it, so we're going to assume the user is a person in the enterprise.
+
+Once you know who is going to use the service, you'll then need to know if the user is authorized to do so. In the previous paragraph we identified that you need to know "who cut the check?" Another important question is, "are they allowed to cut the check?" You really don't want just anybody in your organization sending out checks, do you? Identifying who is authorized to perform an action can be the subject of multiple books, so to keep things simple we'll make our authorization decisions based on group membership, at least at a high level.
+
+Having identified the user and authorized them, the next step is to do something ***important***. It's an enterprise, filled with important things that need doing! Since writing a check is something we can all relate to and represents many of the challenges enterprise services face, we're going to stick with this as our example. We're going to write a check service that will let us send out checks.
+
+Finally, having done something ***important***, we need to make a record of it. We need to track who called our service, and once the service does the important parts, we need to make sure we record it somewhere. This can be recorded in a database, another service, or even sent to standard-out so it can be collected by a log aggregator.
+
 Having identified all the things our service will do, the next step is to identify which part of our infrastructure will be responsible for each decision and action. For our service:
 | Action                                          | Component   | Description                                                                                  |
 |-------------------------------------------------|-------------|----------------------------------------------------------------------------------------------|
@@ -37,15 +95,34 @@ Having identified all the things our service will do, the next step is to identi
 | Log who wrote the check and to whom it was sent | Service     | Write this data to standard-out                                                              |
 | Log aggregation                                 | Kubernetes  | Maybe Elastic?                                                                               |
 
+We'll build each of these components, layer by layer in the following sections. Before we get into the service itself, we need to say hello to the world.
 ### Deploying Hello World
-Once our service is deployed, we can test it out by using curl:
+Our first service will be a simple Hello World service that will serve as the starting point for our check-writing service. Our service is built on Python using Flask. We're using this because it's pretty simple to use and deploy. Go to chapter13/hello-world and run the deploy_helloworld.sh script. 
+```bash
+cd chapter13/hello-world
+./deploy_helloworld.sh
+```
+This will create our ***Namespace***, ***Deployment***, ***Service***, and ***Istio*** objects. Look at the code in the service-source ConfigMap. This is the main body of our code and the framework on which we will build our check service. The code its self doesn't do much:
+```python
+@app.route('/')
+def hello():
+    retVal = {
+        "msg":"hello world!",
+        "host":"%s" % socket.gethostname()
+    }
+    return json.dumps(retVal)
+```
+This code accepts all requests to ***/*** and runs our function called ***hello()***, which sends a simple response. We're embedding our code as a ***ConfigMap*** for the sake of simplicity.
 
+If you've read all the other chapters up to this point, you'll notice that we're violating some cardinal rules with this container from a security standpoint. It's a Docker Hub container running as root. That's OK for now. We didn't want to get bogged down in build processes for this chapter. In ***Chapter 14, Provisioning a Platform***, we'll walk through using Tekton to build out a more secure version of the container for this service.
+
+Once our service is deployed, we can test it out by using curl:
 ```bash
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-curl -v http://service.$hostip.nip.io/
-{"msg": "hello world!", "host": "run-service-785775bf98-fln49"}%
+curl -v http://service.$hostip.nip.io/ 
 ```
 This code isn't terribly exciting, but next we'll add some security to our service.
+
 ### Integrating authentication into our service
 In ***Chapter 12, An Introduction to Istio***, we introduced the RequestAuthentication object. Now we will use this object to enforce authentication. We want to make sure that in order to access our service, you must have a valid JWT. In the previous example, we just called our service directly. Now we want to only get a response if a valid JWT is embedded in the request. We need to make sure to pair our ***RequestAuthentication*** with an ***AuthorizationPolicy*** that forces Istio to require a JWT, otherwise Istio will only reject JWTs that don't conform to our ***RequestAuthenction*** but will allow requests that have no JWT at all.
 
@@ -109,12 +186,12 @@ We also specify ***outputPayloadToHeader: User-Info*** to tell Istio to pass the
 
 Additionally, the ***jwks*** section specifies the RSA public keys used to verify the JWT. This can be obtained by first going to the ***issuer***'s OIDC discovery URL and getting the URL from the ***jwks*** claim.
  
-###### Tips
-We didn't use the ***jwksUri*** configuration option to point to our certificate URL directly because Istio would not be able to validate our self-signed certificate. The demo Istio deployment we're using would require patching the ***istiod*** ***Deployment*** to mount a certificate from a ***ConfigMap***, which we didn't want to do in this book. It is however the best way to integrate with an identity provider so if and when keys rotate, you don't need to make any updates.
+> **⚠ ATTENTION:**  
+> We didn't use the ***jwksUri*** configuration option to point to our certificate URL directly because Istio would not be able to validate our self-signed certificate. The demo Istio deployment we're using would require patching the ***istiod*** ***Deployment*** to mount a certificate from a ***ConfigMap***, which we didn't want to do in this book. It is however the best way to integrate with an identity provider so if and when keys rotate, you don't need to make any updates.
 
-It's important to note that the RequestAuthentication object will tell Istio what form the JWT needs to take, but not what data about the user needs to be present. We'll cover that next in authorization.
+It's important to note that the ***RequestAuthentication*** object will tell Istio what form the JWT needs to take, but not what data about the user needs to be present. We'll cover that next in authorization.
 
-Speaking of authorization, we want to make sure to enforce that the requirement for a JWT, so we created this very simple AuthorizationPolicy:
+Speaking of authorization, we want to make sure to enforce that the requirement for a JWT, so we created this very simple ***AuthorizationPolicy***:
 
 ```yaml
 # kubectl -n istio-hello-world get authorizationpolicies simple-hellow-world -o yaml
@@ -316,12 +393,12 @@ Your service knows who your user is, but needs to call another service. How do y
 
 There are some details we'll walk through that depend on your use case:
 
-1. The user requests an id_token from the identity provider. How the user gets their token doesn't really matter for this part of the sequence. We'll use a utility in OpenUnison for our lab.
-1. Assuming you're authenticated and authorized, your identity provider will give you an id_token with an aud claim that will be accepted by Service-X.
-1. The user uses the id_token as a bearer token for calling Service-X. It goes without saying that Istio will validate this token.
-1. Service-X requests a token for Service-Y from the identity provider on behalf of the user. There are two potential methods to do this. One is impersonation, the other is delegation. We'll cover both in detail later in this section. You'll send your identity provider your original id_token and something to identify the service to the identity provider.
-1. Assuming Service-X is authorized, the identity provider sends a new id_token to Service-X with the original user's attributes and an aud scoped to Service-Y.
-1. Service-X uses the new id_token as the Authorization header when calling Service-Y. Again, Istio is validating the id_token.   
+1. The user requests an **id_token** from the identity provider. How the user gets their token doesn't really matter for this part of the sequence. We'll use a utility in OpenUnison for our lab.
+1. Assuming you're authenticated and authorized, your identity provider will give you an **id_token** with an **aud** claim that will be accepted by Service-X.
+1. The user uses the **id_token** as a bearer token for calling Service-X. It goes without saying that Istio will validate this token.
+1. Service-X requests a token for Service-Y from the identity provider on behalf of the user. There are two potential methods to do this. One is impersonation, the other is delegation. We'll cover both in detail later in this section. You'll send your identity provider your original **id_token** and something to identify the service to the identity provider.
+1. Assuming Service-X is authorized, the identity provider sends a new **id_token** to Service-X with the original user's attributes and an **aud** scoped to Service-Y.
+1. Service-X uses the new **id_token** as the Authorization header when calling Service-Y. Again, Istio is validating the **id_token**.   
 
 Steps 7 and 8 in the previous diagram aren't really important here.
 
