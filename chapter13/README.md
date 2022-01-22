@@ -243,6 +243,11 @@ kubectl delete authorizationpolicy simple-hellow-world -n istio-hello-world
 With the policy disabled, you can now access your service without any JWT. Next, we'll create a policy that requires you to be a member of the group cn=group2,ou=Groups,DC=domain,DC=com in our "Active Directory."
 
 Deploy the below policy (in chapter13/coursed-grained-authorization/coursed-grained-az.yaml):
+```bash
+kubectl apply -f chapter13/coursed-grained-authorization/coursed-grained-az.yaml
+```
+
+
 ```yaml
 ## kubectl -n istio-hello-world get authorizationpolicies service-level-az -o yaml
 ---
@@ -452,13 +457,15 @@ Now that we know how our services will identify themselves to our identity provi
 ##### Deploying and running the check-writing service
 Having walked through much of the theory of using a token exchange to securely call services, let's deploy an example check-writing service. When we call this service, it will call two other services. The first service, ***check-funds***, will use the impersonation profile of OAuth2 Token Exchange while the second service, ***pull-funds***, will use delegation. We'll walk through each of these individually. First, use Helm to deploy an identity provider. Go into the ***chapter13*** directory and run:
 
+
 ```bash
+cd chapter13
 helm -n openunison install openunison-service-auth openunison-service-auth
 ```
 We're not going to go into the details of OpenUnison's configuration. Suffice to say this will set up an identity provider for our services and a way to get an initial token. Next, deploy the write-checks service:
 
 ```bash
-cd write-checks/
+cd chapter13/write-checks/
 ./deploy_write_checks.sh
 ```
 This should look pretty familiar after the first set of examples in this chapter. We deployed our service as Python in a ConfigMap and the same Istio objects we created in the previous service. The only major difference is in our RequestAuthentication object:
@@ -490,7 +497,8 @@ Earlier in the chapter we said we couldn't leak a token we didn't have, so we sh
 With our example check-writing service deployed, let's run it and work backward. Just like with our earlier examples, we'll use ***curl*** to get the token and call our service. In ***chapter13/write-checks***, run ***call_service.sh***:
 ```bash
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-export JWT=$(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token')
+export JWT=$(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/get-user-token/token/user 2>/dev/null| jq -r '.token.id_token')
+jq -R 'split(".") | select(length > 0) | .[1] | @base64d | fromjson' <<< $JWT
 curl -v  -H "Authorization: Bearer $JWT" http://write-checks.$hostip.nip.io/write-check
 curl -v  -H "Authorization: Bearer $JWT" http://write-checks.$hostip.nip.io/write-check  2>/dev/null  | jq -r
 ```
