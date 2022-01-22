@@ -162,7 +162,7 @@ spec:
 This object first specifies how the JWT needs to be formatted in order to be accepted. We're cheating here a bit by just leveraging our Kubernetes JWT. Let's compare this object to our JWT:
 ```json
 //  export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-//  curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token')
+//  curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token'
 //  export JWT=$(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token')
 //  jq -R 'split(".") | select(length > 0) | .[0],.[1] | @base64d | fromjson' <<< $JWT
 {
@@ -302,7 +302,7 @@ curl  -H "Authorization: Bearer $(curl --insecure -u 'mmosley:start123' https://
 There are several headers here. The one we care about is User-Info. This is the name of the header we specified in our RequestAuthentication object. If we decode from base64, we'll get some JSON:
 ```json
 //  export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-//  curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token')
+//  curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token'
 //  export JWT=$(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token')
 //  jq -R 'split(".") | select(length > 0) | .[0],.[1] | @base64d | fromjson' <<< $JWT
 {
