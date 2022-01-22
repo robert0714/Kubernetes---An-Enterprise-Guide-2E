@@ -31,17 +31,17 @@ data:
 
     python3 /src/service.py
   service.py: |-
-    from flask import Flask
+    from flask import Flask, request, jsonify
     import os
     import socket
     import json
-    from flask import request
     from pathlib import Path
     import requests
-    import base64
-    import requests
+    import base64 
     import logging
-    import datetime
+    from logging.handlers import RotatingFileHandler    
+    from time import strftime
+    import traceback
     from elasticapm.contrib.flask import ElasticAPM
 
     app = Flask(__name__)
@@ -57,14 +57,7 @@ data:
 
     apm = ElasticAPM(app)
 
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(	'[%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d] %(message)s',	datefmt='%Y%m%d %H:%M:%S')
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-
+    
     @app.route('/headers')
     def return_headers():
       return json.dumps({"headers":str(request.headers)})
@@ -78,7 +71,7 @@ data:
         az_header = request.headers["Authorization"]
         user_jwt = az_header[7:]
 
-        logging.debug('user_jwt: '+ user_jwt)
+        logger.debug('user_jwt: '+ user_jwt)
 
         # next, get the pod's ServiceAccount token
         # so we can identify the pod to the IdP for
@@ -86,7 +79,7 @@ data:
 
         pod_jwt = Path('/var/run/secrets/kubernetes.io/serviceaccount/token').read_text()
 
-        logging.debug('pod_jwt: '+ pod_jwt)
+        logger.debug('pod_jwt: '+ pod_jwt)
 
         # with the subject (user) jwt and the pod 
         # jwt we can now request an impersonated 
@@ -123,7 +116,7 @@ data:
 
         call_funds_text = resp.text
 
-        logging.debug('Next, pull the funds with a delegated token' )
+        logger.debug('Next, pull the funds with a delegated token' )
 
         # Next, pull the funds with a delegated token
 
@@ -152,7 +145,7 @@ data:
 
         # with an actor token, call the tokens endpoint to
         # get a delegated token
-        logging.debug('with an actor token, call the tokens endpoint to get a delegated token' )
+        logger.debug('with an actor token, call the tokens endpoint to get a delegated token' )
 
         delegation_request = {
           "grant_type":"urn:ietf:params:oauth:grant-type:token-exchange",
@@ -220,8 +213,43 @@ data:
         "status":"I'm not dead yet!"
       }
       return json.dumps(ret_val)
+    
+    @app.after_request
+    def after_request(response):
+        # This IF avoids the duplication of registry in the log,
+        # since that 500 is already logged via @app.errorhandler.
+        if response.status_code != 500:
+            ts = strftime('[%Y-%b-%d %H:%M]')
+            logger.error('%s %s %s %s %s %s',
+                          ts,
+                          request.remote_addr,
+                          request.method,
+                          request.scheme,
+                          request.full_path,
+                          response.status)
+        return response
+
+    @app.errorhandler(Exception)
+    def exceptions(e):
+        ts = strftime('[%Y-%b-%d %H:%M]')
+        tb = traceback.format_exc()
+        logger.error('%s %s %s %s %s 5xx INTERNAL SERVER ERROR\n%s',
+                      ts,
+                      request.remote_addr,
+                      request.method,
+                      request.scheme,
+                      request.full_path,
+                      tb)
+        return "Internal Server Error", 500
 
     if __name__ == "__main__":
+        # The maxBytes is set to this number, in order to demonstrate the generation of multiple log files (backupCount).
+        handler = RotatingFileHandler('app.log', maxBytes=10000, backupCount=3)
+        # getLogger('__name__') - decorators loggers to file / werkzeug loggers to stdout
+        # getLogger('werkzeug') - werkzeug loggers to file / nothing to stdout
+        logger = logging.getLogger('__name__')
+        logger.setLevel(logging.DEBUG)
+        logger.addHandler(handler)
         app.run(host="0.0.0.0", port=8080, debug=True)
 ---
 apiVersion: apps/v1
@@ -267,7 +295,7 @@ spec:
           - name: ELASTIC_APM_ENABLED
             value: 'true'
           - name: ELASTIC_APM_SERVER_URL
-            value: 'http://192.168.57.12:8200'
+            value: 'http://192.168.18.24:8200'
       volumes:
       - name: sources
         configMap:
