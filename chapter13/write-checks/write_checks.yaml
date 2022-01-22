@@ -40,6 +40,8 @@ data:
     import requests
     import base64
     import requests
+    import logging
+    import datetime
     from elasticapm.contrib.flask import ElasticAPM
 
     app = Flask(__name__)
@@ -55,6 +57,14 @@ data:
 
     apm = ElasticAPM(app)
 
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(	'[%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d] %(message)s',	datefmt='%Y%m%d %H:%M:%S')
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
     @app.route('/headers')
     def return_headers():
       return json.dumps({"headers":str(request.headers)})
@@ -68,12 +78,15 @@ data:
         az_header = request.headers["Authorization"]
         user_jwt = az_header[7:]
 
+        logging.debug('user_jwt: '+ user_jwt)
+
         # next, get the pod's ServiceAccount token
         # so we can identify the pod to the IdP for
         # an impersonation token
 
         pod_jwt = Path('/var/run/secrets/kubernetes.io/serviceaccount/token').read_text()
 
+        logging.debug('pod_jwt: '+ pod_jwt)
 
         # with the subject (user) jwt and the pod 
         # jwt we can now request an impersonated 
@@ -90,6 +103,8 @@ data:
         impersonation_headers = {
           "Authorization": "Bearer %s" % pod_jwt
         }
+         
+        
 
         resp = requests.post("https://k8sou.IPADDR.nip.io/auth/idp/service-idp/token",verify=False,data=impersonation_request,headers=impersonation_headers)
 
@@ -107,6 +122,8 @@ data:
         resp = requests.get("http://write-checks.IPADDR.nip.io/check-funds",verify=False,headers=call_funds_headers)
 
         call_funds_text = resp.text
+
+        logging.debug('Next, pull the funds with a delegated token' )
 
         # Next, pull the funds with a delegated token
 
@@ -135,6 +152,7 @@ data:
 
         # with an actor token, call the tokens endpoint to
         # get a delegated token
+        logging.debug('with an actor token, call the tokens endpoint to get a delegated token' )
 
         delegation_request = {
           "grant_type":"urn:ietf:params:oauth:grant-type:token-exchange",

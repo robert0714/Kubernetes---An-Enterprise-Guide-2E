@@ -127,9 +127,12 @@ This code isn't terribly exciting, but next we'll add some security to our servi
 In ***Chapter 12, An Introduction to Istio***, we introduced the RequestAuthentication object. Now we will use this object to enforce authentication. We want to make sure that in order to access our service, you must have a valid JWT. In the previous example, we just called our service directly. Now we want to only get a response if a valid JWT is embedded in the request. We need to make sure to pair our ***RequestAuthentication*** with an ***AuthorizationPolicy*** that forces Istio to require a JWT, otherwise Istio will only reject JWTs that don't conform to our ***RequestAuthenction*** but will allow requests that have no JWT at all.
 
 Even before we configure our objects, we need to get a JWT from somewhere. We're going to use OpenUnison. To work with our API, let's deploy the pipeline token generation chart we deployed in ***Chapter 5, Integrating Authentication into Your Cluster***. Go to the ***chapter5*** directory and run the Helm Chart:
+
 ```bash
+cd chapter5
 helm install orchestra-token-api token-login -n openunison -f /tmp/openunison-values.yaml
 ```
+
 This will give us a way to easily generate a JWT from our internal "Active Directory". Next, we'll deploy the actual policy objects. Go into the ***chapter13/authentication*** directory and run ***deploy-auth.sh***. It will look like:
 ```bash
 ./deploy-auth.sh
@@ -339,17 +342,22 @@ This is pretty basic. We're getting the header from our request. Next, we're dec
 
 In addition to not requiring that our code knows how to verify the JWT, this also makes it easier for us to develop our code in isolation from Istio. Open a shell into your run-service pod and try accessing this service directly with any user:
 ```bash
-kubectl exec -ti run-service-785775bf98-g86gl -n istio-hello-world –- bash
+export PODNAME=$(kubectl -n istio-hello-world  get pods  --no-headers -o custom-columns=":metadata.name" --field-selector status.phase=Running  )
+kubectl -n istio-hello-world exec -it $PODNAME  -- bash
 # export USERINFO=$(echo -n '{"sub":"marc","groups":["group1","group2"]}' | base64 -w 0)
 # curl -H "User-Info: $USERINFO" http://localhost:8080/who-am-i
 ```
 We were able to call our service without having to know anything about Istio, JWTs, or cryptography! Everything was offloaded to Istio so we could focus on our service. While this does make for easier development, what are the impacts on security if there's a way to inject any information we want into our service?
 
 Let's try this directly from a namespace that doesn't have the Istio sidecar:
+
 ```bash
 kubectl run -i --tty curl --image=alpine --rm=true -- sh
-/ # apk update add curl
+/ # apk update 
+/ # apk add curl
 / # curl -H "User-Info $(echo -n '{"sub":"marc","groups":["group1","group2"]}' | base64 -w 0)" http://run-service.istio-hello-world.svc/who-am-i
+
+RBAC: access denied/ #
 ```
 
 Our ***RequestAuthentication*** and ***AuthorizationPolicy*** stop the request. While we're not running the sidecar, our service is, and redirects all traffic to Istio where our policies will be enforced. What about if we try to inject our own User-Info header from a valid request?
@@ -357,6 +365,13 @@ Our ***RequestAuthentication*** and ***AuthorizationPolicy*** stop the request. 
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
 export USERINFO=$(echo -n '{"sub":"marc","groups":["group1","group2"]}' | base64 -w 0)
 curl  -H "Authorization: Bearer $(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user 2>/dev/null| jq -r '.token.id_token')" -H "User-Info: $USERINFO" http://service.$hostip.nip.io/who-am-i
+{"name": "mmosley", "groups": ["cn=group2,ou=Groups,DC=domain,DC=com", "cn=k8s-cluster-admins,ou=Groups,DC=domain,DC=com"]}
+```
+or 
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+export USERINFO=$(echo -n '{"sub":"marc","groups":["group1","group2"]}' | base64 -w 0)
+curl  -H "Authorization: Bearer $(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/k8s-api-token/token/user  | jq -r '.token.id_token')" -H "User-Info: $USERINFO" http://service.$hostip.nip.io/who-am-i
 {"name": "mmosley", "groups": ["cn=group2,ou=Groups,DC=domain,DC=com", "cn=k8s-cluster-admins,ou=Groups,DC=domain,DC=com"]}
 ```
 Once again, our attempt to override who the user is outside of a valid JWT has been foiled by Istio. We've shown how Istio injects the user's identity into our service, now we need to know how to authorize a user's entitlements.
