@@ -341,7 +341,7 @@ spec:
     matchLabels:
       app: write-checks
   jwtRules:
-  - issuer: JWT_ISS
+  - issuer: https://k8sou.IPADDR.nip.io/auth/idp/k8sIdp
     jwks: 'JWKS_FROM_SERVER'
     audiences:
     - users
