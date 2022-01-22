@@ -525,8 +525,10 @@ Jwt issuer is not configured
 The output you see is the result of the calls to /write-check, which then calls /check-funds and /pull-funds. Let's walk through each call, the tokens that are generated, and the code that generates them.
 
 ##### Using Impersonation
-We're not talking about the same Impersonation you used in Chapter 5, Integrating Authentication into Your Cluster. It's a similar concept, but this is specific to token exchange. When /write-check needs to get a token to call /check-funds, it asks OpenUnison for a token on behalf of our user, mmosley. The important aspect of Impersonation is that there's no reference to the requesting client in the generated token. The /check-funds service has no knowledge that the token it's received wasn't retrieved by the user themselves. Working backward, the impersonated_jwt in the response to our service call is what /write-check used to call /check-funds. Here's the payload after dropping the result into jwt.io:
+We're not talking about the same Impersonation you used in Chapter 5, Integrating Authentication into Your Cluster. It's a similar concept, but this is specific to token exchange. When **/write-check** needs to get a token to call **/check-funds**, it asks OpenUnison for a token on behalf of our user, **mmosley**. The important aspect of Impersonation is that there's no reference to the requesting client in the generated token. The **/check-funds** service has no knowledge that the token it's received wasn't retrieved by the user themselves. Working backward, the **impersonated_jwt** in the response to our service call is what **/write-check** used to call **/check-funds**. Here's the payload after dropping the result into **jwt.io**:
 ```json
+// export  impersonated_jwt=$(curl  -H "Authorization: Bearer $(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/get-user-token/token/user 2>/dev/null| jq -r '.token.id_token')" http://write-checks.$hostip.nip.io/write-check  2>/dev/null  | jq -r '.impersonated_jwt' )
+//  jq -R 'split(".") | select(length > 0) | .[1] | @base64d | fromjson' <<< $impersonated_jwt
 {
   "iss": "https://k8sou.192-168-2-119.nip.io/auth/idp/service-idp",
   "aud": "checkfunds",
@@ -549,8 +551,11 @@ We're not talking about the same Impersonation you used in Chapter 5, Integratin
 }
 ```
 
-The two important fields here are sub and aud. The sub field tells /check-funds who the user is and the aud field tells Istio which services can consume this token. Compare this to the payload from the original token in the user_jwt response:
+The two important fields here are **sub** and **aud**. The sub field tells **/check-funds** who the user is and the **aud** field tells Istio which services can consume this token. Compare this to the payload from the original token in the **user_jwt** response:
 ```json
+// export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+// export  user_jwt=$(curl  -H "Authorization: Bearer $(curl --insecure -u 'mmosley:start123' https://k8sou.$hostip.nip.io/get-user-token/token/user 2>/dev/null| jq -r '.token.id_token')" http://write-checks.$hostip.nip.io/write-check  2>/dev/null  | jq -r '.user_jwt' )
+//  jq -R 'split(".") | select(length > 0) | .[1] | @base64d | fromjson' <<< $user_jwt
 {
   "iss": "https://k8sou.192-168-2-119.nip.io/auth/idp/service-idp",
   "aud": "users",
@@ -571,13 +576,155 @@ The two important fields here are sub and aud. The sub field tells /check-funds 
   ]
 }
 ```
-The original sub is the same, but the aud is different. The original aud is for users while the impersonated aud is for checkfunds. This is what differentiates the impersonated token from the original one. While our Istio deployment is configured to accept both audiences for the same service, that's not a guarantee in most production clusters. When we call /check-funds, you'll see that in the output we echo the user of our token, mmosley.
+The original **sub** is the same, but the **aud** is different. The original **aud** is for users while the impersonated aud is for **checkfunds**. This is what differentiates the impersonated token from the original one. While our Istio deployment is configured to accept both audiences for the same service, that's not a guarantee in most production clusters. When we call **/check-funds**, you'll see that in the output we echo the user of our token, **mmosley**.
 
-Now that we've seen the end product, let's see how we get it. First, we get the original JWT that was used to call /write-check:
+Now that we've seen the end product, let's see how we get it. First, we get the original JWT that was used to call **/write-check**:
+```python
+# let's first get the original JWT. We'll
+# use this as an input for impersonation
+az_header = request.headers["Authorization"]
+user_jwt = az_header[7:]
+```
+Once we have the original JWT, we need the Pod's ServiceAccount token:
+```python
+# next, get the pod's ServiceAccount token
+# so we can identify the pod to the IdP for
+# an impersonation token
+pod_jwt = Path('/var/run/secrets/kubernetes.io/serviceaccount/token').read_text()
+```
+
+We now have everything we need to get an impersonation token. We'll create a POST body and an Authorization header to authenticate us to OpenUnison to get our token:
+```python
+# with the subject (user) jwt and the pod 
+# jwt we can now request an impersonated 
+# token for our user from openunison
+impersonation_request = {
+  "grant_type":"urn:ietf:params:oauth:grant-type:token-exchange",
+  "audience":"checkfunds",
+  "subject_token":user_jwt,
+  "subject_token_type":"urn:ietf:params:oauth:token-type:id_token",
+  "client_id":"sts-impersonation"
+}
+impersonation_headers = {
+  "Authorization": "Bearer %s" % pod_jwt
+}
+```
+
+The first data structure we created is the body of an HTTP POST that will tell OpenUnison to generate an impersonation token for the clientfunds aud using our existing user (user_jwt). OpenUnison will authenticate our service by verifying the JWT sent in the Authorization header as a Bearer token using the TokenReview API.
+
+OpenUnison will then apply its internal policy to verify that our service is able to generate a token for mmosley for the clientfunds audience and then generate an access_token, id_token, and refresh_token. We'll use the id_token to call /check-funds:
+
+```python
+resp = requests.post("https://k8sou.IPADDR.nip.io/auth/idp/service-idp/token",verify=False,data=impersonation_request,headers=impersonation_headers)
+response_payload = json.loads(resp.text)
+impersonated_id_token = response_payload["id_token"]
+# with the impersonated user's id_token, call another
+# service as that user
+call_funds_headers = {
+  "Authorization": "Bearer %s" % impersonated_id_token
+}
+resp = requests.get("http://write-checks.IPADDR.nip.io/check-funds",verify=False,headers=call_funds_headers)
+```
+
+Since the final JWT makes no mention of the impersonation, how do we track a request back to our service? Hopefully, you're piping your logs into a centralized logging system. If we look at the jti claim of our impersonation token we can find the impersonation call in the OpenUnison logs:
+
+```bash
+INFO  AccessLog - [AzSuccess] - service-idp - https://k8sou.192-168-2-119.nip.io/auth/idp/service-idp/token - username=system:serviceaccount:write-checks:default,ou=oauth2,o=Tremolo - client 'sts-impersonation' impersonating 'mmosley', jti : 'C8Qh8iY9FJdFzEO3pLRQzw'
+```
+
+So, we at least have a way of tying them together. We can see our Pod's service account was authorized to create the impersonation token for mmosley.
+
+Having worked through an example of impersonation, next let's cover token delegation.
+
+##### Using delegation
+In the last example we used impersonation to generate a new token on behalf of our user, but our downstream service had no knowledge the impersonation happened. Delegation is different in that the token carries information about both the original user and the service, or actor, that requested it.
+
+This means that the service being called knows both the originator of the call and the service that is making the call. We can see this in the pull_funds_text value from the response of our call_service.sh run. It contains both our original user, mmosley, and the ServiceAccount for the service that made the call, system:serviceaccount:write-checks:default. Just as with impersonation, let's look at the generated token:
+```json
+{
+  "iss": "https://k8sou.192-168-2-119.nip.io/auth/idp/service-idp",
+  "aud": "pullfunds",
+  "exp": 1631497059,
+  "jti": "xkaQhMgKgRvGBqAsOWDlXA",
+  "iat": 1631496999,
+  "nbf": 1631496879,
+  "nonce": "272f1900-f9d9-4161-a31c-6c6dde80fcb9",
+  "sub": "mmosley",
+  "amr": [
+    "pwd"
+  ],
+  "name": " Mosley",
+  "groups": [
+    "cn=group2,ou=Groups,DC=domain,DC=com",
+    "cn=k8s-cluster-admins,ou=Groups,DC=domain,DC=com"
+  ],
+  "preferred_username": "mmosley",
+  "email": "mmosley@tremolo.dev",
+  "act": {
+    "sub": "system:serviceaccount:write-checks:default",
+    "amr": [
+      "k8s-sa"
+    ],
+    .
+    .
+    .
+  }
+}
+```
+In addition to the claims that identify the user as mmosley, there's an act claim that identifies the ServiceAccount that's used by /write-checks. Our service can make additional authorization decisions based on this claim or simply log it to note that the token it received was delegated to a different service. In order to generate this token, we start out by getting the original subject's JWT and the Pod's ServiceAccount token.
+
+Instead of calling OpenUnison for a delegated token, first our client has to get an actor token by using the client_credentials grant. This will get us the token that will eventually go into the act claim:
+```python
+client_credentials_grant_request = {
+  "grant_type": "client_credentials",
+  "client_id" : "sts-delegation"
+}
+delegation_headers = {
+  "Authorization": "Bearer %s" % pod_jwt
+}
+resp = requests.post("https://k8sou.IPADDR.nip.io/auth/idp/service-idp/token",verify=False,data=client_credentials_grant_request,headers=delegation_headers)
+response_payload = json.loads(resp.text)
+actor_token = response_payload["id_token"]
+```
+
+We authenticate to OpenUnison using our Pod's native identity. OpenUnison returns an access_token and an id_token, but we only need the id_token. With our actor token in hand, we can now get our delegation token:
+```python
+delegation_request = {
+  "grant_type":"urn:ietf:params:oauth:grant-type:token-exchange",
+  "audience":"pullfunds",
+  "subject_token":user_jwt,
+  "subject_token_type":"urn:ietf:params:oauth:token-type:id_token",
+  "client_id":"sts-delegation",
+  "actor_token": actor_token,
+  "actor_token_type": "urn:ietf:params:oauth:token-type:id_token"
+}
+resp = requests.post("https://k8sou.IPADDR.nip.io/auth/idp/service-idp/token",verify=False,data=delegation_request)
+response_payload = json.loads(resp.text)
+delegation_token = response_payload["id_token"]
+```
+
+Similarly to impersonation, in this call we send the original user's token (user_jwt), but also the actor_token we just received from OpenUnison. We also don't send an Authorization header. The actor_token authenticates us already. Finally, we're able to use our returned token to call /pull-funds.
+
+Now that we've looked at the most correct way to call services, using both impersonation and delegation, let's take a look at some anti-patterns and why you shouldn't use them.
 
 #### Passing tokens between services
-#### Using simple impersonation
+Where in the previous section we used an identity provider to generate either impersonation or delegation tokens, this method skips that and just passes the original token from service to service. This is a simple approach that's easy to implement. It also creates a larger blast radius. If the token gets leaked, and given that it's now being passed to multiple services, the likelihood of it leaking goes up quite a bit, you've now not just exposed one service. You've exposed all the services that trust that token.
 
+While using OAuth2 Token Exchange does require more work, it will limit your blast radius should a token be leaked. Next, we'll look at how you may simply tell a downstream service who's calling it.
+#### Using simple impersonation
+Where the previous examples of service-to-service calls rely on a third party to generate a token for a user, direct impersonation is where your service's code uses a service account (in the generic sense, not the Kubernetes version) to call the second service and just tells the service who the user is as an input to the call. For instance, instead of calling OpenUnison to get a new token, /write-check could have just used the Pod's ServiceAccount token to call /check-funds with a parameter containing the user's ID. Something like this would work as follows:
+```python
+call_headers = {
+  "Authorization": "Bearer %s" % pod_jwt
+}
+resp = requests.post("https://write-checks.IPADDR.nip.io/check-funds?user=mmosley",verify=False,data=impersonation_request,headers=call_headers)
+```
+
+This is, again, very simple. You can tell Istio to authenticate a Kubernetes ServiceAccount. This takes two lines of code to do something that took fifteen to twenty using a token service. Just like with passing tokens between services, this approach leaves you exposed in multiple ways. First, if anyone gets the ServiceAccount used by our service, they can impersonate anyone they want without checks. Using the token service ensures that a compromised service account doesn't lead to it being used to impersonate anyone.
+
+You might find this method very similar to the impersonation we used in Chapter 5, Integrating Authentication into Your Cluster. You're correct. While this uses the same mechanism, a ServiceAccount and some parameters to specify who the user is, the type of impersonation Kubernetes uses for the API server is often referred to as a protocol transition. This is used when you are moving from one protocol (OpenID Connect) to another (a Kubernetes service account). As we discussed in Chapter 5, there are several controls you can put in place with Kubernetes impersonation including using NetworkPolicies, RBAC, and TokenRequest API. It's also a much more isolated use case than a generic service.
+
+We've walked through multiple ways for services to call and authenticate each other. While it may not be the simplest way to secure access between services, it will limit the impact of a leaked token. Now that we know how our services will talk to each other, the last topic we need to cover is the relationship between Istio and API gateways.
 
 ## Do I need an API gateway?
 If you're using Istio, do you still need an API gateway? In the past, Istio has been primarily concerned with routing traffic for services. It got traffic into the cluster and figured out where to route it to. API gateways have more typically been focused on application-level functionality such as authentication, authorization, input validation, and logging.
