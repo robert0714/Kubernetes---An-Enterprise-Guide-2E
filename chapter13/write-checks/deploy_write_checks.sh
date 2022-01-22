@@ -11,6 +11,8 @@ export JWT_CONTENT=$(jq -R 'split(".") | select(length > 0) | .[1] | @base64d | 
 echo "getting Jwt issuer"
 export jwt_issuer=$(jq -r '.iss' <<< $JWT_CONTENT)
 
+echo "getting openid-config"
+curl --insecure  $jwt_issuer/.well-known/openid-configuration 2>/dev/null | jq -r  
 
 echo "getting oidc config"
 export oidc_config=$(curl --insecure  $jwt_issuer/.well-known/openid-configuration 2>/dev/null | jq -r '.jwks_uri')
