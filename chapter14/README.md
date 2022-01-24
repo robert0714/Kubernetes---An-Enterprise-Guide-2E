@@ -245,11 +245,16 @@ kubectl patch deployments gitlab-gitlab-shell -n gitlab -p '{"spec":{"template":
 10. To get your root password to log in to GitLab, get it from the secret that was generated:
 ```bash
 $ kubectl get secret gitlab-gitlab-initial-root-password -o json -n gitlab | jq -r '.data.password' | base64 -d
-10xtSWXfbvH5umAbCk9NoN0wAeYsUo9jRVbXrfLn KbzBoPLrCGZ6kYRe8wdREcDl
+
+9gYzg3zeDyNLS4Zshyjpko9wVQ53fvBFpGTjsXubVWYkNSxlX8xpeEm3uipj1Jsb
 ```
 
 You now can log in to your GitLab instance by going to **https://gitlab.apps.x-x-x-x.nip.io**, where ***x-x-x-x*** is the IP of your server. 
 
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+echo  https://gitlab.apps.$hostip.nip.io
+```
 Since my server is running on 192.168.2.119, my GitLab instance is running on https://gitlab.apps.192-168-2-119.nip.io/.
 
 #### Creating example projects
