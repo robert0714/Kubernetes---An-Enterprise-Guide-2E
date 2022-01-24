@@ -1,4 +1,12 @@
 # Chapter 13 Building and Deploying Applications on Istio
+In the previous chapter, we deployed Istio and Kiali into our cluster. We also deployed an example application to see how the pieces fit together. In this chapter, we're going to look at what it takes to build applications that will run on Istio. We'll start by examining the differences between microservices and monolithic applications. We'll start by deploying a monolithic application on Istio, and then transition to building microservices that will run on Istio. This chapter will cover:
+
+* Technical requirements 
+* Deploying a monolith
+* Building a microservice
+* Do I need an API gateway?
+
+Once you have completed this chapter, you'll have a practical understanding of the difference between a monolith and a microservice, along with the information you'll need to determine which one is best for you, and will also have deployed a secured microservice in Istio.
 ## Technical requirements
 
 ```bash
