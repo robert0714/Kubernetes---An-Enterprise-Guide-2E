@@ -142,6 +142,7 @@ You have better to test.
 docker pull busybox
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
 docker tag busybox   docker.apps.$hostip.nip.io/busybox
+docker pull   docker.apps.$hostip.nip.io/busybox
 ```
 
 ### Deploying OpenUnison and GateKeeper
