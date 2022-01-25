@@ -45,6 +45,8 @@ sudo echo "internal-ca.crt" >> /etc/ca-certificates.conf
 sudo update-ca-certificates
 sudo reboot
 ```
+The Objective is that you execute command about docker push or pull.
+
 or refer[ How to Add Self-Sign Certificate Authority to Your Browsers](https://dchan.tech/security/how-to-add-self-sign-certificate-authority-to-your-browsers/)
 
 Once your VM is back, deploy a fresh cluster by running **chapter2/create-cluster.sh**.
@@ -132,7 +134,15 @@ echo  https://docker.apps.$hostip.nip.io
 ```
 open url https://docker.apps.$hostip.nip.io in browser
 
+
 You won't see much since the registry has no web UI, but you also shouldn't get a certificate error. That's because we deployed **cert-manager** and are issuing signed certificates! With our registry running, we'll deploy OpenUnison and GateKeeper.
+
+You have better to test.
+```bash
+docker pull busybox
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+docker tag busybox   docker.apps.$hostip.nip.io/busybox
+```
 
 ### Deploying OpenUnison and GateKeeper
 In ***Chapter 5, Integrating Authentication into Your Cluster***, we introduced OpenUnison to authenticate access to our KinD deployment. OpenUnison comes in two flavors. The first, which we have had deployed in earlier chapters' examples, is a login portal that lets us authenticate using a central source and pass group information to our RBAC policies. The second, which we'll deploy in this chapter, is a **Namespace as a Service (NaaS)** portal that we'll use as the basis for integrating the systems that will manage our pipeline. This portal will also give us a central UI for requesting projects to be created and managing access to our project's systems.
@@ -255,7 +265,7 @@ You now can log in to your GitLab instance by going to **https://gitlab.apps.x-x
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
 echo  https://gitlab.apps.$hostip.nip.io
 ```
-Since my server is running on 192.168.2.119, my GitLab instance is running on https://gitlab.apps.192-168-2-119.nip.io/.
+Since my server is running on 192.168.18.24, my GitLab instance is running on https://gitlab.apps.192-168-18-24.nip.io/.
 
 #### Creating example projects
 To explore Tekton and ArgoCD, we will create two projects. One will be for storing a simple Python web service, while the other will store the manifests for running the service. Let's deploy these projects:
@@ -332,9 +342,13 @@ We'll build our pipeline one object at a time. The first set of tasks is to crea
 ```bash
 $ ssh-keygen -t rsa -m PEM -f ./gitlab-hello-python
 ```
-2. Log in to GitLab and navigate to the *hello-python* project we created. Click on **Settings** | **Repository** | **Deploy Keys**, and click **Expand**. Use *tekton* as the title and paste the contents of the *github-hello-python.pub* file you just created into the **Key** section. Keep **Write access allowed** unchecked and click **Add Key**.
-3. Next, create the *build-python-hello* namespace and the following secret. Replace the *ssh-privatekey* attribute with the Base64-encoded content of the *gitlab-hello-python* file we created in step 1. The annotation is what tells Tekton which server to use this key with. The server name is the *Service* in the GitLab namespace:
+2. Log in to GitLab and navigate to the *hello-python* project we created. Click on **Settings** | **Repository** | **Deploy Keys**, and click **Expand**. Use *tekton* as the title and paste the contents of the ***github-hello-python.pub*** file you just created into the **Key** section. Keep **Write access allowed** ***unchecked*** and click **Add Key**.
+3. Next, create the *build-python-hello* namespace and the following secret. Replace the *ssh-privatekey* attribute with the Base64-encoded content of the *gitlab-hello-python* file we created in ***step 1***. The annotation is what tells Tekton which server to use this key with. The server name is the *Service* in the GitLab namespace:
 ```yaml
+// kubectl create namespace build-python-hello
+// kubectl -n build-python-hello apply -f  git-pull.yaml
+// kubectl -n build-python-hello get secret git-pull -o yaml
+// 
 apiVersion: v1
 data:
   ssh-privatekey: ...
@@ -350,9 +364,13 @@ type: kubernetes.io/ssh-auth
 ```bash
 $ ssh-keygen -t rsa -m PEM -f ./gitlab-hello-python-operations
 ```
-5. Log in to GitLab and navigate to the hello-python-operations project we created. Click on Settings | Repository | Deploy Keys, and click Expand. Use tekton as the title and paste the contents of the github-hello-python-operations.pub file you just created into the Key section. Make sure Write access allowed is checked and click Add Key.
-6. Next, create the following secret. Replace the ssh-privatekey attribute with the Base64-encoded content of the gitlab-hello-python-operations file we created in step 4. The annotation is what tells Tekton which server to use this key with. The server name is the Service we created in step 6 in the GitLab namespace:
+5. Log in to GitLab and navigate to the *hello-python-operations* project we created. Click on **Settings** | **Repository** | **Deploy Keys**, and click **Expand**. Use *tekton* as the title and paste the contents of the ***github-hello-python-operations.pub*** file you just created into the **Key** section. Make sure **Write access allowed** is ***checked*** and click **Add Key**.
+6. Next, create the following secret. Replace the *ssh-privatekey* attribute with the Base64-encoded content of the *gitlab-hello-python-operations* file we created in ***step 4***. The annotation is what tells Tekton which server to use this key with. The server name is the **Service** we created in ***step 6*** in the GitLab namespace:
 ```yaml
+// kubectl create namespace python-hello-build
+// kubectl -n build-python-hello apply -f  git-write.yaml
+// kubectl -n python-hello-build get secret git-write -o yaml
+
 apiVersion: v1
 data:
   ssh-privatekey: ...
@@ -368,10 +386,12 @@ $ kubectl create -f chapter14/example-apps/tekton/tekton-serviceaccount.yaml
 ```
 8. We need a container that contains both git and kubectl. We'll build chapter14/example-apps/docker/PatchRepoDockerfile and push it to our internal registry. Make sure to replace 192-168-2-114 with the hostname for your server's IP address:
 ```bash
-$ docker build -f ./PatchRepoDockerfile -t \
-  docker.apps.192-168-2-114.nip.io/gitcommit/gitcommit .
-$ docker push \
-  docker.apps.192-168-2-114.nip.io/gitcommit/gitcommit
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+echo  https://docker.apps.$hostip.nip.io
+cd  chapter14/example-apps/docker
+docker build -f ./PatchRepoDockerfile -t docker.apps.$hostip.nip.io/gitcommit/gitcommit .
+docker push docker.apps.$hostip.nip.io/gitcommit/gitcommit
 ```
 
 The previous steps set up one key that Tekton will use to pull source code from our service's repository and another key that Tekton will use to update our deployment manifests with a new image tag. The operations repository will be watched by ArgoCD to make updates. Next, we will work on deploying a Tekton pipeline to build our application.
@@ -486,7 +506,7 @@ You can check on the progress of your pipeline using kubectl, or you can use Tek
 We don't want to manually run builds. We want builds to be automated. Tekton provides the trigger project to provide webhooks so that whenever GitLab receives a commit, it can tell Tekton to build a PipelineRun object for us. Setting up a trigger involves creating a Pod, with its own service account that can create PipelineRun objects, a Service for that Pod, and an Ingress object to host HTTPS access to the Pod. You also want to protect the webhook with a secret so that it isn't triggered inadvertently. Let's deploy these objects to our cluster:
 
 1. Add chapter14/example-apps/tekton/tekton-webhook-cr.yaml to your cluster. This ClusterRole will be used by any namespace that wants to provision webhooks for builds.
-1. Edit chapter14/example-apps/tekton/tekton-webhook.yaml. At the bottom of the file is an Ingress object. Change 192-168-2-119 to represent the IP of your cluster, with dashes instead of dots. Then, add the file to your cluster:
+1. Edit chapter14/example-apps/tekton/tekton-webhook.yaml. At the bottom of the file is an Ingress object. Change 192-168-18-24 to represent the IP of your cluster, with dashes instead of dots. Then, add the file to your cluster:
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -497,7 +517,7 @@ metadata:
     cert-manager.io/cluster-issuer: ca-issuer
 spec:
   rules:
-  - host: "python-hello-application.build.192-168-2-119.nip.io"
+  - host: "python-hello-application.build.192-168-18-24.nip.io"
     http:
       paths:
       - backend:
@@ -513,7 +533,7 @@ spec:
     secretName: ingresssecret
 ```
 3. Log in to GitLab. Go to Admin Area | Network. Click on Expand next to Outbound Requests. Check the Allow requests to the local network from web hooks and services option and click Save changes.
-4. Go to the hello-python project we created and click on Settings | Webhooks. For the URL, use your Ingress host with HTTPS – for instance, https://python-hello-application.build.192-168-2-119.nip.io/. For Secret Token, use notagoodsecret, and for Push events, set the branch name to main. Finally, click on Add webhook.
+4. Go to the hello-python project we created and click on Settings | Webhooks. For the URL, use your Ingress host with HTTPS – for instance, https://python-hello-application.build.192-168-18-24.nip.io/. For Secret Token, use notagoodsecret, and for Push events, set the branch name to main. Finally, click on Add webhook.
 5. Once added, click on Test, choosing Push Events. If everything is configured correctly, a new PipelineRun object should have been created. You can run tkn pipelinerun list -n python-hello-build to see the list of runs; there should be a new one running. After a few minutes, you'll have a new container and a patched Deployment in the python-hello-operations project!
 
 We covered quite a bit in this section to build our application and deploy it using GitOps. The good news is that everything is automated; a push will create a new instance of our application! The bad news is that we had to create over a dozen Kubernetes objects and manually make updates to our projects in GitLab. In the last section, we'll automate this process. First, let's deploy ArgoCD so that we can get our application running!
@@ -752,7 +772,7 @@ TEST SUITE: None
 $ helm upgrade orchestra tremolo/orchestra -n openunison -f /tmp/openunison-values.yaml
 ```
 
-Once the openunison-orchestra Pod is running again, log in to OpenUnison by going to https://k8sou.apps.192-168-2-119.nip.io/, replacing "192-168-2-119" with your own IP address, but with dashes instead of dots.
+Once the openunison-orchestra Pod is running again, log in to OpenUnison by going to https://k8sou.apps.192-168-18-24.nip.io/, replacing "192-168-18-24" with your own IP address, but with dashes instead of dots.
 
 Use the username mmosley and the password start123. You'll notice that we have several new badges besides tokens and the dashboard.
 
@@ -857,14 +877,14 @@ Notice that on each project, our user is a developer. This means that we can for
 ### Deploying dev manifests
 The first thing we'll need to do is deploy our operational manifests into our "dev" environment. Inside GitLab, fork python-hello-dev/python-hello-operations into your personal namespace in GitLab. Make sure to fork from the python-hello-dev Namespace and NOT the python-hello-production Namespace.
 
-Once forked, clone the project from your own namespace (App Dev). You'll need to attach an SSH key to your GitLab account. When you clone the project, you'll need to convert the URL provided by GitLab into an SSH URL. For instance, when I clone the repository, GitLab gives me git@gitlab.apps.192-168-2-119.nip.io:app-dev/python-hello-operations.git. However, when I clone the repository, I add ssh:// to the front and :2222 after the hostname so that Git can reach our GitLab SSH service:
+Once forked, clone the project from your own namespace (App Dev). You'll need to attach an SSH key to your GitLab account. When you clone the project, you'll need to convert the URL provided by GitLab into an SSH URL. For instance, when I clone the repository, GitLab gives me git@gitlab.apps.192-168-18-24.nip.io:app-dev/python-hello-operations.git. However, when I clone the repository, I add ssh:// to the front and :2222 after the hostname so that Git can reach our GitLab SSH service:
 ```bash
-$ git clone ssh://git@gitlab.apps.192-168-2-119.nip.io:2222/app-dev/python-hello-operations.git
+$ git clone ssh://git@gitlab.apps.192-168-18-24.nip.io:2222/app-dev/python-hello-operations.git
 Cloning into 'python-hello-operations'...
-The authenticity of host '[gitlab.apps.192-168-2-119.nip.io]:2222 ([192.168.2.119]:2222)' can't be established.
+The authenticity of host '[gitlab.apps.192-168-18-24.nip.io]:2222 ([192.168.18.24]:2222)' can't be established.
 ECDSA key fingerprint is SHA256:F8VKUrn0ugFoRrLSBc93JNdWsRv9Zwy9wFlL0ZPqSf4.
 Are you sure you want to continue connecting (yes/no/[fingerprint])? Yes
-Warning: Permanently added '[gitlab.apps.192-168-2-119.nip.io]:2222,[192.168.2.119]:2222' (ECDSA) to the list of known hosts.
+Warning: Permanently added '[gitlab.apps.192-168-18-24.nip.io]:2222,[192.168.18.24]:2222' (ECDSA) to the list of known hosts.
 remote: Enumerating objects: 3, done.
 remote: Counting objects: 100% (3/3), done.
 remote: Compressing objects: 100% (2/2), done.
@@ -884,7 +904,7 @@ Delta compression using up to 8 threads
 Compressing objects: 100% (4/4), done.
 Writing objects: 100% (6/6), 874 bytes | 874.00 KiB/s, done.
 Total 6 (delta 0), reused 0 (delta 0)
-To ssh://gitlab.apps.192-168-2-119.nip.io:2222/app-dev/python-hello-operations.git 7f0fb7c..3ce8b5c  main -> main
+To ssh://gitlab.apps.192-168-18-24.nip.io:2222/app-dev/python-hello-operations.git 7f0fb7c..3ce8b5c  main -> main
 ```
 
 Now, look in your forked project in GitLab and you will find a Deployment manifest that's ready to be synchronized into the development Namespace in our cluster. From inside your forked project, click on Merge Requests on the left-hand menu bar.
@@ -924,7 +944,7 @@ Delta compression using up to 8 threads
 Compressing objects: 100% (12/12), done.
 Writing objects: 100% (13/13), 3.18 KiB | 3.18 MiB/s, done.
 Total 13 (delta 1), reused 0 (delta 0)
-To ssh://gitlab.apps.192-168-2-119.nip.io:2222/app-dev/python-hello-build.git
+To ssh://gitlab.apps.192-168-18-24.nip.io:2222/app-dev/python-hello-build.git
    7120c3f..0a6e833  main -> main
 ```
 
