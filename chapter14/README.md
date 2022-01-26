@@ -40,8 +40,8 @@ You'll see the  **chapter14/shell/ssl** directory is generated.
 ```bash
 cd chapter14/shell/ssl/
 sudo cp tls.crt /usr/local/share/ca-certificates/internal-ca.crt
-sudo cp tls.crt /usr/share/ca-certificates/internal-ca.crt
-sudo echo "internal-ca.crt" >> /etc/ca-certificates.conf
+sudo cp tls.crt /usr/share/ca-certificates/internal-ca.crt  (maybee ommit....)
+sudo echo "internal-ca.crt" >> /etc/ca-certificates.conf  (maybee ommit....)
 sudo update-ca-certificates
 sudo reboot
 ```
@@ -143,6 +143,10 @@ docker pull busybox
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
 docker tag busybox   docker.apps.$hostip.nip.io/busybox
 docker push   docker.apps.$hostip.nip.io/busybox
+
+curl -X GET https://docker.apps.$hostip.nip.io/v2/_catalog
+
+{"repositories":["busybox"]}
 ```
 
 [Official Reference] (https://docs.docker.com/registry/insecure/)
