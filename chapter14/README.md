@@ -142,7 +142,34 @@ You have better to test.
 docker pull busybox
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
 docker tag busybox   docker.apps.$hostip.nip.io/busybox
-docker pull   docker.apps.$hostip.nip.io/busybox
+docker push   docker.apps.$hostip.nip.io/busybox
+```
+
+[Official Reference] (https://docs.docker.com/registry/insecure/)
+
+> Deploy a plain HTTP registry
+Edit the **daemon.json** file, whose default location is /etc/docker/daemon.json on Linux
+If the daemon.json file does not exist, create it. Assuming there are no other settings in the file, it should have the following contents:
+```json
+{
+  "insecure-registries" : ["docker.apps.$hostip.nip.io:5000"]
+}
+```
+
+> Use self-signed certificates
+```bash 
+sudo mkdir -p /etc/docker/certs.d/docker.apps.$hostip.nip.io:5000
+
+openssl req \
+  -newkey rsa:4096 -nodes -sha256 -keyout ca.key \
+  -addext "subjectAltName = DNS:docker.apps.$hostip.nip.io" \
+  -x509 -days 365 -out ca.crt
+  
+sudo cp ca.crt  /etc/docker/certs.d/docker.apps.$hostip.nip.io:5000/ca.crt
+
+sudo cp ca.crt   /usr/local/share/ca-certificates/docker.apps.$hostip.nip.io.crt
+
+pdate-ca-certificates
 ```
 
 ### Deploying OpenUnison and GateKeeper
