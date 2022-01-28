@@ -1,4 +1,4 @@
-# Provisioning a Platform
+# Chapter 14  Provisioning a Platform
 Every chapter in this book, up until this point, has focused on the infrastructure of your cluster. We have explored how to deploy Kubernetes, how to secure it, and how to monitor it. What we haven't talked about is how to deploy applications.
 
 In this, our final chapter, we're going to work on building an application deployment platform using what we've learned about Kubernetes. We're going to build our platform based on some common enterprise requirements. Where we can't directly implement a requirement, because building a platform on Kubernetes can fill its own book, we'll call it out and provide some insights.
@@ -794,7 +794,7 @@ Let's quickly run through the workflow that we see in the preceding figure:
 
 Once the code is merged, ArgoCD will synchronize the build and operations projects. The webhook in the application project will kick off a Tekton pipeline that will build our container and update the development operations project with the tag for the latest container. ArgoCD will synchronize the updated manifest into our application's development namespace. Once testing is completed, the application owner submits a merge request from the development operations workspace to the production operations workspace, triggering ArgoCD to launch into production.
 
-Nowhere in this flow is there a step called "operations staff uses kubectl to create a namespace." This is a simple flow and won't totally avoid your operations staff from using kubectl, but it should be a good starting point. All this automation requires an extensive set of objects to be created:
+Nowhere in this flow is there a step called "operations staff uses ``kubectl`` to create a namespace." This is a simple flow and won't totally avoid your operations staff from using ``kubectl``, but it should be a good starting point. All this automation requires an extensive set of objects to be created:
 
 
 ![Application onboarding object map](images/B17950_14_07.png)  
@@ -804,14 +804,14 @@ The above diagram shows the objects that need to be created in our environment a
 
 In GitLab, we create a project for our application code, operations, and build pipeline. We also fork the operations project as a development operations project. For each project, we generate deploy keys and register webhooks. We also create groups to match the roles we defined earlier in this chapter.
 
-For Kubernetes, we create namespaces for the development and production environments. We also create a namespace for the Tekton pipeline. We add the keys as needed to Secrets. In the build namespace, we create all the scaffolding to support the webhook that will trigger automatic builds. That way, our developers only need to worry about creating their pipeline objects.
+For Kubernetes, we create namespaces for the development and production environments. We also create a namespace for the Tekton pipeline. We add the keys as needed to ``Secrets``. In the build namespace, we create all the scaffolding to support the webhook that will trigger automatic builds. That way, our developers only need to worry about creating their pipeline objects.
 
 In our last application, ArgoCD, we will create an **AppProject** that hosts both our build and operations namespaces. We will also add the SSH keys we generated when creating our GitLab projects. Each project also gets an **Application** object in our **AppProject** that instructs ArgoCD how to synchronize from GitLab. Finally, we add RBAC rules to ArgoCD so that our developers can view their application synchronization status but owners and operations can make updates and changes.
 
 ### Designing a GitOps strategy
 We have outlined the steps we want for our developer workflow and how we'll build those objects. Before we get into talking about implementation, let's work through how ArgoCD, OpenUnison, and Kubernetes will interact with each other.
 
-So far, we've deployed everything manually in our cluster by running kubectl commands off of manifests that we put in this book's Git repo. That's not really the ideal way to do this. What if you needed to rebuild your cluster? Instead of manually recreating everything, wouldn't it be better to just let ArgoCD deploy everything from Git? We're not going to do that for this chapter, but it's something you should aim for as you design your own GitOps-based cluster. The more you can keep in Git, the better.
+So far, we've deployed everything manually in our cluster by running ``kubectl`` commands off of manifests that we put in this book's Git repo. That's not really the ideal way to do this. What if you needed to rebuild your cluster? Instead of manually recreating everything, wouldn't it be better to just let ArgoCD deploy everything from Git? We're not going to do that for this chapter, but it's something you should aim for as you design your own GitOps-based cluster. The more you can keep in Git, the better.
 
 That said, how will OpenUnison communicate with the API server when it performs all this automation for us? The "easiest" way for OpenUnison is to just call the API server.
 
@@ -844,11 +844,46 @@ You don't need to build this out yourself! ***chapter14/naas-gitops*** is a Helm
 With our developer workflow designed and example projects ready to go, next, we'll update OpenUnison, GitLab, and ArgoCD to get all this automation to work!
 
 ### Integrating GitLab
-We configured GitLab for SSO when we first deployed the Helm chart. The gitlab-oidc Secret we deployed has all the information GitLab needs to access SSO from OpenUnison. The naas-gitops Helm chart will configure SSO with GitLab and add a badge to the front page, just like for tokens and the dashboard. First, we need to update our OpenUnison Secret to complete the integration:
+We configured GitLab for SSO when we first deployed the Helm chart. The ``gitlab-oidc`` **Secret** we deployed has all the information GitLab needs to access SSO from OpenUnison. The ``naas-gitops`` Helm chart will configure SSO with GitLab and add a badge to the front page, just like for tokens and the dashboard. First, we need to update our OpenUnison **Secret** to complete the integration:
+```yaml 
+// kubectl -n gitlab get secret gitlab-oidc  -o yaml
+apiVersion: v1
+data:
+  provider: bmFtZTogb3BlbmlkX2Nvbm5lY3QKbGFiZWw6IE9wZW5Vbmlzb24KYXJnczoKICBuYW1lOiBvcGVuaWRfY29ubmVjdAogIHNjb3BlOgogICAgLSBvcGVuaWQKICAgIC0gcHJvZmlsZQogIHJlc3BvbnNlX3R5cGU6IGNvZGUKICBpc3N1ZXI6IGh0dHBzOi8vazhzb3UuYXBwcy4xOTItMTY4LTE4LTI5Lm5pcC5pby9hdXRoL2lkcC9rOHNJZHAKICBkaXNjb3Zlcnk6IHRydWUKICBjbGllbnRfYXV0aF9tZXRob2Q6IHF1ZXJ5CiAgdWlkX2ZpZWxkOiBzdWIKICBzZW5kX3Njb3BlX3RvX3Rva2VuX2VuZHBvaW50OiBmYWxzZQogIGNsaWVudF9vcHRpb25zOgogICAgaWRlbnRpZmllcjogZ2l0bGFiCiAgICBzZWNyZXQ6IHNlY3JldAogICAgcmVkaXJlY3RfdXJpOiBodHRwczovL2dpdGxhYi5hcHBzLjE5Mi0xNjgtMTgtMjkubmlwLmlvL3VzZXJzL2F1dGgvb3BlbmlkX2Nvbm5lY3QvY2FsbGJhY2sK
+kind: Secret
+metadata:
+  creationTimestamp: "2022-01-27T07:01:53Z"
+  name: gitlab-oidc
+  namespace: gitlab
+  resourceVersion: "121230"
+  uid: c173caf7-3700-4ccf-a01b-a9893e29f06e
+type: Opaque
+```
+```yaml 
+// kubectl -n gitlab get secret gitlab-oidc  -o json |  jq -r '.data.provider' | base64 -d
+name: openid_connect
+label: OpenUnison
+args:
+  name: openid_connect
+  scope:
+    - openid
+    - profile
+  response_type: code
+  issuer: https://k8sou.apps.192-168-18-29.nip.io/auth/idp/k8sIdp
+  discovery: true
+  client_auth_method: query
+  uid_field: sub
+  send_scope_to_token_endpoint: false
+  client_options:
+    identifier: gitlab
+    secret: secret
+    redirect_uri: https://gitlab.apps.192-168-18-29.nip.io/users/auth/openid_connect/callback
+```
+1. Log in to GitLab as root. Go to your user's profile area and click on **Access Tokens**. For **Name**, use ``openunison``. Leave **Expires** blank and check the API scope. Click **Create personal access token**. Copy and paste the token into a notepad or some other place. Once you leave this screen, you can't retrieve this token again.  
 
-1. Log in to GitLab as root. Go to your user's profile area and click on Access Tokens. For Name, use openunison. Leave Expires blank and check the API scope. Click Create personal access token. Copy and paste the token into a notepad or some other place. Once you leave this screen, you can't retrieve this token again.  
-2. Edit the orchestra-secrets-source Secret in the openunison namespace. Add two keys:
+2. Edit the ``orchestra-secrets-source`` Secret in the ``openunison`` namespace. Add two keys:
 ```yaml
+// kubectl -n openunison get secret  orchestra-secrets-source -o yaml
 apiVersion: v1
 data:
   K8S_DB_SECRET: aW0gYSBzZWNyZXQ=
@@ -889,6 +924,11 @@ With the RBAC bindings deleted, next, we'll integrate ArgoCD.
 ArgoCD has built-in support for OpenID Connect. It wasn't configured for us in the deployment, though:
 
 1. Edit **argocd-cm** **ConfigMap** in the **argocd** namespace, adding the ***url*** and ***oidc.config keys***, as shown in the following code block. Make sure to update 192-168-2-140 to match your cluster's IP address. Mine is **192.168.2.114**, so I'll be using **192-168-2-114**:
+```bash
+kubectl -n argocd get configmaps
+kubectl -n argocd edit configmaps argocd-cm
+```
+
 ```yaml
 apiVersion: v1
 data:
@@ -906,10 +946,22 @@ data:
 ```bash
 $ kubectl patch configmap argocd-cm -n argocd -p '{"data":{"accounts.openunison":"apiKey","accounts.openunison.enabled":"true"}}'
 $ argocd account generate-token --account openunison
+
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyMTM0MmM2YS01ZDk0LTQ1MmItODlmYi04NTU2YTA5YTVhMjciLCJpYXQiOjE2NDMzNTgzOTcsImlzcyI6ImFyZ29jZCIsIm5iZiI6MTY0MzM1ODM5Nywic3ViIjoib3BlbnVuaXNvbjphcGlLZXkifQ.PhUrcBl1kAjlVuT83cJZOCYONmw3iBVpvoxIoC2NZgk
 ```
 3. Take the output of the **generate-token** command and add it as the **ARGOCD_TOKEN** key to **orchestra-secrets-source** **Secret** in the **openunison** namespace. Don't forget to Base64-encode it.
-4. Finally, we want to create ArgoCD RBAC rules so that we can control who can access the web UI and the CLI. Edit argocd-rbac-cm ConfigMap and add the following keys. The first key will let our systems administrators and our API key do anything in ArgoCD. The second key maps all users that aren't mapped by policy.csv into a role into a non-existent role so that they won't have access to anything:
+```bash
+$ export JWT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyMTM0MmM2YS01ZDk0LTQ1MmItODlmYi04NTU2YTA5YTVhMjciLCJpYXQiOjE2NDMzNTgzOTcsImlzcyI6ImFyZ29jZCIsIm5iZiI6MTY0MzM1ODM5Nywic3ViIjoib3BlbnVuaXNvbjphcGlLZXkifQ.PhUrcBl1kAjlVuT83cJZOCYONmw3iBVpvoxIoC2NZgk
+
+$ echo $JWT |base64
+ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnFkR2tpT2lJeU1UTTBNbU0yWVMwMVpEazBMVFExTW1JdE9EbG1ZaTA0TlRVMllUQTVZVFZoTWpjaUxDSnBZWFFpT2pFMk5ETXpOVGd6T1Rjc0ltbHpjeUk2SW1GeVoyOWpaQ0lzSW01aVppSTZNVFkwTXpNMU9ETTVOeXdpYzNWaUlqb2liM0JsYm5WdWFYTnZianBoY0dsTFpYa2lmUS5QaFVyY0JsMWtBamxWdVQ4M2NKWk9DWU9ObXcz
+
+$ kubectl -n openunison get secret orchestra-secrets-source
+$ kubectl -n openunison edit secret orchestra-secrets-source
+```
+4. Finally, we want to create ArgoCD RBAC rules so that we can control who can access the web UI and the CLI. Edit ``argocd-rbac-cm`` **ConfigMap** and add the following keys. The first key will let our systems administrators and our API key do anything in ArgoCD. The second key maps all users that aren't mapped by ``policy.csv`` into a role into a non-existent role so that they won't have access to anything:
 ```yaml
+// kubectl -n argocd edit configmap argocd-rbac-cm
 data:  
   policy.csv: |-
     g, k8s-cluster-k8s-administrators,role:admin
@@ -923,8 +975,9 @@ With ArgoCD integrated, the final step involves deploying our custom chart!
 OpenUnison is already deployed. We need to deploy our Helm chart, which includes the automation that reflects our workflow:
 ```bash
 $ cd chapter14/naas-gitops
-$  kubectl delete configmap myvd-book -n openunison
+$  kubectl -n openunison delete configmap myvd-book
 configmap "myvd-book" deleted
+
 $ helm install orchestra-naas . -n openunison -f /tmp/openunison-values.yaml
 NAME: orchestra-naas
 LAST DEPLOYED: Thu Oct  7 13:51:19 2021
@@ -932,12 +985,15 @@ NAMESPACE: openunison
 STATUS: deployed
 REVISION: 1
 TEST SUITE: None
-$ helm upgrade orchestra tremolo/orchestra -n openunison -f /tmp/openunison-values.yaml
+
+$ helm  -n openunison   list
+
+$ helm -n openunison upgrade orchestra tremolo/orchestra  -f /tmp/openunison-values.yaml
+
 ```
+Once the ``openunison-orchestra`` Pod is running again, log in to OpenUnison by going to ``https://k8sou.apps.192-168-18-29.nip.io/,`` replacing "192-168-18-29" with your own IP address, but with dashes instead of dots.
 
-Once the openunison-orchestra Pod is running again, log in to OpenUnison by going to https://k8sou.apps.192-168-18-24.nip.io/, replacing "192-168-18-24" with your own IP address, but with dashes instead of dots.
-
-Use the username mmosley and the password start123. You'll notice that we have several new badges besides tokens and the dashboard.
+Use the username ``mmosley`` and the password ``start123``. You'll notice that we have several new badges besides tokens and the dashboard.
 
 ![OpenUnison NaaS portal](images/B17950_14_10.png)  
 Figure 14.10: OpenUnison NaaS portal
