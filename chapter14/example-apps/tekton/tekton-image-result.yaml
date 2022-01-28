@@ -6,5 +6,5 @@ metadata:
 spec:
   params:
   - name: url
-    value: docker.apps.192-168-2-114.nip.io/python-hello-build/hello-world-service
+    value: docker.apps.IPADDR.nip.io/python-hello-build/hello-world-service
   type: image

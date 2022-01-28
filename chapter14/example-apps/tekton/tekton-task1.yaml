@@ -18,7 +18,7 @@ spec:
       type: image
   steps:
   - name: create-image-tag
-    image: docker.apps.192-168-2-114.nip.io/gitcommit/gitcommit
+    image: docker.apps.IPADDR.nip.io/gitcommit/gitcommit
     securityContext:
       runAsUser: 431
       runAsGroup: 0

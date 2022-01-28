@@ -472,6 +472,8 @@ steps:
   name: build-and-push
   resources: {}
 ```
+> gcr.io/kaniko-project/executor in chapter14/example-apps/tekton/tekton-task2.yaml is v0.16.0  ! it maybe too old ? At 2021/1/28 , [the latest is v1.7.0](https://github.com/GoogleContainerTools/kaniko/releases) .
+
 
 The Kaniko container is what's called a "distro-less" container. It's not built with an underlying shell, nor does it have many of the command-line tools you may be used to. It's just a single binary. This means that any variable manipulation, such as generating a tag for the image, needs to be done before this step. Notice that the image being created doesn't reference the result we created in the first task. It instead references a parameter called ``imageURL``. While we could have referenced the result directly, it would make it harder to test this task because it is now tightly bound to the first task. By using a parameter that is set by our pipeline, we can test this task on its own. Once run, this task will generate and push our container.
 
@@ -525,14 +527,67 @@ We pull these tasks together in a pipeline – specifically, ***chapter14/exampl
 We reference parameters and task results, but nothing is hardcoded. This makes our *Pipeline* reusable. We also include the `runAfter` directive in our second and third tasks to make sure that our tasks are run in order. Otherwise, tasks will be run in parallel. Given each task has dependencies on the task before it, we don't want to run them at the same time. Next, let's deploy our pipeline and run it:
 
 1. Add *chapter14/yaml/gitlab-shell-write.yaml* to your cluster; this is an endpoint so that Tekton can write to SSH using a separate key.
-1. Run *chapter14/shell/exempt-python-build.sh* to disable GateKeeper in our build namespace. This is needed because Tekton's containers for checking out code run as root and do not work when running with a random user ID.
-1. Add the *chapter14/example-apps/tekton/tekton-source-git.yaml* file to your cluster; this tells Tekton where to pull your application code from.
-1. Edit *chapter14/example-apps/tekton/tekton-image-result.yaml*, replacing 192-168-2-114 with the hash representation of your server's IP address, and add it to your cluster.
-1. Edit *chapter14/example-apps/tekton/tekton-task1.yaml*, replacing the image host with the host for your Docker registry, and add the file to your cluster.
-1. Add *chapter14/example-apps/tekton/tekton-task2.yaml* to your cluster.
-1. Edit *chapter14/example-apps/tekton/tekton-task3.yaml*, replacing the image host with the host for your Docker registry, and add the file to your cluster.
-1. Add *chapter14/example-apps/tekton/tekton-pipeline.yaml* to your cluster.
-1. Add *chapter14/example-apps/tekton/tekton-pipeline-run.yaml* to your cluster.
+```bash
+kubectl apply -f chapter14/yaml/gitlab-shell-write.yaml
+kubectl -n gitlab get svc
+```
+2. Run *chapter14/shell/exempt-python-build.sh* to disable GateKeeper in our build namespace. This is needed because `Tekton's containers for checking out code run as root` and do not work when running with a random user ID.
+```bash
+./chapter14/shell/exempt-python-build.sh
+```
+3. Add the *chapter14/example-apps/tekton/tekton-source-git.yaml* file to your cluster; this tells Tekton where to pull your application code from.
+```bash
+kubectl apply -f chapter14/example-apps/tekton/tekton-source-git.yaml
+kubectl -n python-hello-build  get pipelineresources
+```
+4. Edit *chapter14/example-apps/tekton/tekton-image-result.yaml*, replacing 192-168-2-114 with the hash representation of your server's IP address, and add it to your cluster.
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+sed "s/IPADDR/$hostip/g" < ./chapter14/example-apps/tekton/tekton-image-result.yaml  > /tmp/tekton-image-result.yaml
+kubectl apply -f /tmp/tekton-image-result.yaml
+```
+or
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+sed "s/192-168-2-114/$hostip/g" < ./chapter14/example-apps/tekton/tekton-image-result.yaml  >  /tmp/tekton-image-result.yaml
+kubectl apply -f /tmp/tekton-image-result.yaml
+```
+5. Edit *chapter14/example-apps/tekton/tekton-task1.yaml*, replacing the image host with the host for your Docker registry, and add the file to your cluster.
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+echo  https://docker.apps.$hostip.nip.io
+sed "s/IPADDR/$hostip/g" < ./chapter14/example-apps/tekton/tekton-task1.yaml  > /tmp/tekton-task1.yaml
+kubectl apply -f /tmp/tekton-task1.yaml
+```
+or
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+echo  https://docker.apps.$hostip.nip.io
+sed "s/192-168-2-114/$hostip/g" < ./chapter14/example-apps/tekton/tekton-task1.yaml  >  /tmp/tekton-task1.yaml
+kubectl apply -f /tmp/tekton-task1.yaml
+```
+6. Add *chapter14/example-apps/tekton/tekton-task2.yaml* to your cluster.
+```bash
+kubectl apply -f chapter14/example-apps/tekton/tekton-task2.yaml
+kubectl -n python-hello-build  get tasks
+```
+7. Edit *chapter14/example-apps/tekton/tekton-task3.yaml*, replacing the image host with the host for your Docker registry, and add the file to your cluster.
+```bash
+echo  https://docker.apps.$hostip.nip.io
+sed "s/IPADDR/$hostip/g" < ./chapter14/example-apps/tekton/tekton-task3.yaml  > /tmp/tekton-task3.yaml
+kubectl apply -f /tmp/tekton-task3.yaml
+kubectl -n python-hello-build  get tasks
+```
+or
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+echo  https://docker.apps.$hostip.nip.io
+sed "s/192-168-2-140/$hostip/g" < ./chapter14/example-apps/tekton/tekton-task3.yaml  > /tmp/tekton-task3.yaml
+kubectl apply -f /tmp/tekton-task3.yaml
+kubectl -n python-hello-build  get tasks
+```
+8. Add *chapter14/example-apps/tekton/tekton-pipeline.yaml* to your cluster.
+9. Add *chapter14/example-apps/tekton/tekton-pipeline-run.yaml* to your cluster.
 
 You can check on the progress of your pipeline using **kubectl**, or you can use Tekton's CLI tool called ``tkn`` (https://github.com/tektoncd/cli). Running ``tkn pipelinerun describe build-hello-pipeline-run -n python-hello-build`` will list out the progress of your build. You can rerun the build by recreating your ``run`` object, but that's not very efficient. Besides, what we really want is for our pipeline to run on a commit!
 
