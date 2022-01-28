@@ -679,8 +679,14 @@ $ kubectl apply -f chapter14/argocd/argocd-policy.yaml
 $ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 ```
 
-2. Create the ``Ingress`` object for ArgoCD by running ``chapter14/deploy-argocd-ingress.sh``. This script sets the IP in the hostname correctly and adds the ingress objects to the cluster.
+2. Create the ``Ingress`` object for ArgoCD by running ``chapter14/argocd/deploy-argocd-ingress.sh``. This script sets the IP in the hostname correctly and adds the ingress objects to the cluster.
+```bash
+./chapter14/argocd/deploy-argocd-ingress.sh
+```
 3. Get the root password by running ``kubectl get secret argocd-initial-admin-secret -n argocd -o json | jq -r '.data.password' | base64 -d``. Save this password.
+```bash
+kubectl get secret argocd-initial-admin-secret -n argocd -o json | jq -r '.data.password' | base64 -d
+```
 4. We need to tell ArgoCD to run as a user and group 999 so our default mutation doesn't assign a user of 1000 and a group of 2000 to make sure SSH keys are read properly. Run the following patches:
 ```bash
 $ kubectl patch deployment argocd-server -n argocd -p '{"spec":{"template":{"spec":{"containers":[{"name":"argocd-server","securityContext":{"runAsUser":999,"runAsGroup":999}}]}}}}}'
@@ -688,6 +694,8 @@ $ kubectl patch deployment argocd-repo-server  -n argocd -p '{"spec":{"template"
 ```
 5. Edit the ``argocd-server`` **Deployment** in the ``argocd`` namespace. Add ``--insecure`` to the command:
 ```yaml
+// kubectl -n argocd get deployment argocd-server -o yaml
+// kubectl -n argocd edit deployment argocd-server 
     spec:
       containers:
       - command:
@@ -696,11 +704,12 @@ $ kubectl patch deployment argocd-repo-server  -n argocd -p '{"spec":{"template"
         - argocd-repo-server:8081
         - --insecure
 ```
-6. You can now log in to ArgoCD by going to the ``Ingress`` host you defined in ***step 2***. You will need to download the ArgoCD CLI utility as well from https://github.com/argoproj/argo-cd/releases/latest. Once downloaded, log in by running ``./argocd login grpc-argocd.apps.192-168-2-114.nip.io``, replacing ``192-168-2-114`` with the IP of your server, and with dashes instead of dots.
+6. You can now log in to ArgoCD by going to the ``Ingress`` host you defined in ***step 2***. You will need to download the ArgoCD CLI utility as well from https://github.com/argoproj/argo-cd/releases/latest. Once downloaded (brew install argocd / choco install argocd-cli ), log in by running ``./argocd login grpc-argocd.apps.192-168-2-114.nip.io``, replacing ``192-168-2-114`` with the IP of your server, and with dashes instead of dots. 
 ```bash
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
 ./argocd login grpc-argocd.apps.$hostip.nip.io
 ```
+> Argocd's default username is ``admin`` . [reference](https://tanzu.vmware.com/developer/guides/argocd-gs/)
 7. Create the python-hello namespace.
 ```bash
 kubectl  create  namespace python-hello
@@ -710,9 +719,11 @@ kubectl  create  namespace python-hello
 kubectl apply -f chapter14/yaml/python-hello-policy.yaml
 ```
 
-9. Before we can add our GitLab repository, we need to tell ArgoCD to trust our GitLab instance's SSH host. Since we will have ArgoCD talk directly to the GitLab shell service, we'll need to generate ``known_host`` for that Service. To make this easier, we included a script that will run ``known_host`` from outside the cluster but rewrite the content as if it were from inside the cluster. Run the **chapter14/shell/getSshKnownHosts.sh** script and pipe the output into the ``argocd`` command to import ``known_host``. Remember to change the hostname to reflect your own cluster's IP address:
+9. Before we can add our GitLab repository, we need to tell ArgoCD to trust our GitLab instance's SSH host. Since we will have ArgoCD talk directly to the GitLab shell service, we'll need to generate ``known_host`` for that Service. To make this easier, we included a script that will run ``known_host`` from outside the cluster but rewrite the content as if it were from inside the cluster. Run the **chapter14/argocd/getSshKnownHosts.sh** script and pipe the output into the ``argocd`` command to import ``known_host``. Remember to change the hostname to reflect your own cluster's IP address:
+
 ```bash
-$ ./chapter14/argocd/getSshKnownHosts.sh gitlab.apps.192-168-2-114.nip.io | argocd cert add-ssh --batch
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+$ ./chapter14/argocd/getSshKnownHosts.sh gitlab.apps.$hostip.nip.io | argocd cert add-ssh --batch
 Enter SSH known hosts entries, one per line. Press CTRL-D when finished.
 Successfully created 3 SSH known host entries
 ```
@@ -723,9 +734,13 @@ $ ssh-keygen -t rsa -m PEM -f ./argocd-python-hello
 11. In GitLab, add the public key to the ``python-hello-operations`` repository by going to the project and clicking on **Settings** | **Repository**. Next to **Deploy Keys**, click **Expand**. For **Title**, use ``argocd``. Use the contents of ``argocd-python-hello.pub`` and click **Add key**. Then, add the key to ArgoCD using the CLI and replace the public GitLab host with the ``gitlab-gitlab-shell`` ``Service`` hostname:
 ```bash
 $ argocd repo add git@gitlab-gitlab-shell.gitlab.svc.cluster.local:root/hello-python-operations.git --ssh-private-key-path ./argocd-python-hello
+
 repository 'git@gitlab-gitlab-shell.gitlab.svc.cluster.local:root/hello-python-operations.git' added
 ```
 12. Our last step is to create an ``Application`` object. You can create it through the web UI or the CLI. You can also create it by creating an ``Application`` object in the ``argocd`` namespace, which is what we'll do. Create the following object in your cluster (**chapter14/example-apps/argocd/argocd-python-hello.yaml**):
+```bash
+kubectl apply -f chapter14/example-apps/argocd/argocd-python-hello.yaml
+```
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -747,16 +762,23 @@ spec:
   syncPolicy:
     automated: {}
 ```
+Wait for a mins..
+
+```bash
+kubectl -n python-hello get deployment python-hello -o yaml
+kubectl -n python-hello get pod 
+```
+
 This is about as basic a configuration as is possible. We're working off simple manifests. ArgoCD can work from JSONnet and Helm too. After this application is created, look at the Pods in the ``python-hello`` namespace. You should have one running! Making updates to your code will result in updates to the namespace.
 
 We now have a code base that can be deployed automatically with a commit. We spent two dozen pages, ran dozens of commands, and created more than 20 objects to get there. Instead of manually creating these objects, it would be best to automate the process. Now that we have the objects that need to be created, we can automate the onboarding. In the next section, we will take the manual process of building the links between GitLab, Tekton, and ArgoCD to line up with our business processes.
 
 ## Automating project onboarding using OpenUnison
-Earlier in this chapter, we deployed the OpenUnison NaaS portal. This portal lets users request new namespaces to be created and allows developers to request access to these namespaces via a self-service interface. The workflows built into this portal are very basic but create the namespace and appropriate RoleBinding objects. What we want to do is build a workflow that integrates our platform and creates all of the objects we created manually earlier in this chapter. The goal is that we're able to deploy a new application into our environment without having to run the kubectl command (or at least minimize its use).
+Earlier in this chapter, we deployed the OpenUnison NaaS portal. This portal lets users request new namespaces to be created and allows developers to request access to these namespaces via a self-service interface. The workflows built into this portal are very basic but create the namespace and appropriate ``RoleBinding`` objects. What we want to do is build a workflow that integrates our platform and creates all of the objects we created manually earlier in this chapter. The goal is that we're able to deploy a new application into our environment without having to run the ``kubectl`` command (or at least minimize its use).
 
 This will require careful planning. Here's how our developer workflow will run:
 
-
+![Platform developer workflow](images/B17950_14_06.png)  
 Figure 14.6: Platform developer workflow
 
 Let's quickly run through the workflow that we see in the preceding figure:
@@ -775,6 +797,7 @@ Once the code is merged, ArgoCD will synchronize the build and operations projec
 Nowhere in this flow is there a step called "operations staff uses kubectl to create a namespace." This is a simple flow and won't totally avoid your operations staff from using kubectl, but it should be a good starting point. All this automation requires an extensive set of objects to be created:
 
 
+![Application onboarding object map](images/B17950_14_07.png)  
 Figure 14.7: Application onboarding object map
 
 The above diagram shows the objects that need to be created in our environment and the relationships between them. With so many moving parts, it's important to automate the process. Creating these objects manually is both time-consuming and error-prone. We'll work through that automation later in this chapter.
@@ -792,12 +815,12 @@ So far, we've deployed everything manually in our cluster by running kubectl com
 
 That said, how will OpenUnison communicate with the API server when it performs all this automation for us? The "easiest" way for OpenUnison is to just call the API server.
 
-
+![Writing objects directly to the API server](images/B17950_14_08.png)  
 Figure 14.8: Writing objects directly to the API server
 
 This will work. We'll get to our end goal of a developer workflow using GitOps, but what about our cluster management workflow? We want to get as many of the benefits from GitOps as cluster operators as our developers do! To that end, a better strategy would be to write our objects to a Git repository. That way, when OpenUnison creates these objects, they're tracked in Git, and if changes need to be made outside of OpenUnison, those changes are tracked too.
 
-
+![Writing objects to Git](images/B17950_14_09.png)  
 Figure 14.9: Writing objects to Git
 
 When OpenUnison needs to create objects in Kubernetes, instead of writing them directly to the API server, it will write them into a management project in GitLab. ArgoCD will synchronize these manifests into the API server.
@@ -916,7 +939,7 @@ Once the openunison-orchestra Pod is running again, log in to OpenUnison by goin
 
 Use the username mmosley and the password start123. You'll notice that we have several new badges besides tokens and the dashboard.
 
-
+![OpenUnison NaaS portal](images/B17950_14_10.png)  
 Figure 14.10: OpenUnison NaaS portal
 
 Since we're the first person to log in, we automatically have admin access to the portal and cluster management access for the cluster. The ArgoCD and GitLab badges will lead you to those apps. Click on the OpenID Connect login button and you'll SSO into both. The Tekton badge gives you SSO access to Tekton's dashboard. This will be helpful in debugging pipelines. The New Application badge is where the magic happens. That's where you can create a new application that will generate all the linkages you need between GitLab, ArgoCD, Kubernetes, and Tekton.
@@ -930,6 +953,7 @@ Before we create a new application, we need to create our cluster management pro
 1. In the **Reason** field, type ***initialization***
 1. Click **Submit Workflow**
 
+![Initializing the cluster repo](images/B17950_14_11.png)  
 Figure 14.11: Initializing the cluster repo
 
 If you watch the OpenUnison logs, you'll see quite a bit of action. This workflow:
@@ -958,7 +982,7 @@ Our first step is to log in to OpenUnison as jjackson. Upon logging in, you'll s
 
 Next, log in as mmosley. In the menu bar at the top of the screen, you'll see Open Approvals with a red 1 next to it. Click on Open Approvals.
 
-
+![Open Approvals](images/B17950_14_12.png)  
 Figure 14.12: Open Approvals
 
 Next to the one open request, click Review. Scroll to the bottom and for Justification, put demo and click Approve Request. Then, click Confirm Approval. Now would be a good time to get a fresh cup of coffee. This will take a few minutes because multiple things are happening:
@@ -981,17 +1005,17 @@ Now that our development infrastructure is in place, the next step is to get our
 
 Log in to OpenUnison with the username app-dev and the password start123. In the menu bar, click on Request Access.
 
-
+![Request Access](images/B17950_14_13.png)  
 Figure 14.13: Request Access
 
 Next, click on the triangle next to Local Deployment and then click on Developers. Click on Add To Cart.
 
-
+![Adding developer access to the cart](images/B17950_14_14.png)  
 Figure 14.14: Adding developer access to the cart
 
 Once you've added it to your cart, click on Check Out on the menu bar. On the right, where it says Supply Reason, type for work and click Submit Request.
 
-
+![Adding developer access to the cart](images/B17950_14_15.png)  
 Figure 14.15: Adding developer access to the cart
 
 At this point, log out and log back in as jjackson. On the upper menu bar, there will be an Open Approvals option with a red 1 next to it. Just as when we were initializing the system, click on Open Approvals and approve the request of app-dev.
@@ -1000,7 +1024,7 @@ This workflow is different from the new application workflow we ran to create he
 
 Log out and log back in as app-dev. Click on the GitLab badge and sign in with OpenUnison. You'll see four projects.
 
-
+![Developer projects](images/B17950_14_16.png)  
 Figure 14.16: Developer projects
 
 These projects will drive your application's development and deployment. Here are the descriptions for each project:
@@ -1049,11 +1073,12 @@ To ssh://gitlab.apps.192-168-18-24.nip.io:2222/app-dev/python-hello-operations.g
 
 Now, look in your forked project in GitLab and you will find a Deployment manifest that's ready to be synchronized into the development Namespace in our cluster. From inside your forked project, click on Merge Requests on the left-hand menu bar.
 
+![Merge requests menu](images/B17950_14_17.png)  
 Figure 14.17: Merge requests menu
 
 On the next screen, click on New merge request. This will bring up a screen to choose which branch you want to merge into dev. Choose main and then click Compare branches and continue.
 
-
+![Merge requests](images/B17950_14_18.png)  
 Figure 14.18: Merge requests
 
 You can update the information in the merge request for additional data. Click on Create merge request at the bottom of the page.
@@ -1105,7 +1130,7 @@ $ git push
 
 Just as with the other repositories, open a merge request as app-dev, and merge as jjackson. Then, go to your Tekton dashboard and pick python-hello-build from the namespace picker in the upper right-hand corner.
 
-
+![Tekton Dashboard](images/B17950_14_19.png)  
 Figure 14.19: Tekton Dashboard
 
 If everything went smoothly, you should now have a pipeline running to build a container and update our development environment. If we look in our dev operations project, we'll see that there's a new commit by Tekton that merged in a change to the image of our dev environment to match the image we just built. The commit has the hash of the commit to our application project, so we can tie them together. Lastly, go to ArgoCD and look at the python-hello-dev application. It's now synchronizing (or will within 3 minutes) our update to dev and rolling out our new image.
