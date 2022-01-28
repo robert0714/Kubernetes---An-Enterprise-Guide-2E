@@ -117,7 +117,7 @@ metadata:
     cert-manager.io/cluster-issuer: ca-issuer
 spec:
   rules:
-  - host: "python-hello-application.build.192-168-2-119.nip.io"
+  - host: "python-hello-application.build.IPADDR.nip.io"
     http:
       paths:
       - backend:
@@ -129,7 +129,7 @@ spec:
         path: "/"
   tls:
   - hosts:
-    - "python-hello-application.build.192-168-2-119.nip.io"
+    - "python-hello-application.build.IPADDR.nip.io"
     secretName: ingresssecret
 
 

@@ -377,11 +377,11 @@ We'll build our pipeline one object at a time. The first set of tasks is to crea
 $ ssh-keygen -t rsa -m PEM -f ./gitlab-hello-python
 ```
 2. Log in to GitLab and navigate to the *hello-python* project we created. Click on **Settings** | **Repository** | **Deploy Keys**, and click **Expand**. Use *tekton* as the title and paste the contents of the ***gitlab-hello-python.pub*** file you just created into the **Key** section. Keep **Write access allowed** ***unchecked*** and click **Add Key**.
-3. Next, create the *build-python-hello* namespace and the following secret. Replace the *ssh-privatekey* attribute with the Base64-encoded content of the *gitlab-hello-python* file we created in ***step 1***. The annotation is what tells Tekton which server to use this key with. The server name is the *Service* in the GitLab namespace:
+3. Next, create the *python-hello-build* namespace and the following secret. Replace the *ssh-privatekey* attribute with the Base64-encoded content of the *gitlab-hello-python* file we created in ***step 1***. The annotation is what tells Tekton which server to use this key with. The server name is the *Service* in the GitLab namespace:
 ```yaml
-// kubectl create namespace build-python-hello
-// kubectl -n build-python-hello apply -f  git-pull.yaml
-// kubectl -n build-python-hello get secret git-pull -o yaml
+// kubectl create namespace python-hello-build
+// kubectl -n python-hello-build apply -f  git-pull.yaml
+// kubectl -n python-hello-build get secret git-pull -o yaml
 // 
 apiVersion: v1
 data:
@@ -391,7 +391,7 @@ metadata:
   annotations:
     tekton.dev/git-0: gitlab-gitlab-shell.gitlab.svc.cluster.local
   name: git-pull
-  namespace: build-python-hello
+  namespace: python-hello-build
 type: kubernetes.io/ssh-auth
 ```
 4. Create an SSH key pair that we'll use for our pipeline to push to the operations repository. When prompted for a passphrase, just hit Enter to skip adding a passphrase:
@@ -573,6 +573,7 @@ kubectl -n python-hello-build  get tasks
 ```
 7. Edit *chapter14/example-apps/tekton/tekton-task3.yaml*, replacing the image host with the host for your Docker registry, and add the file to your cluster.
 ```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
 echo  https://docker.apps.$hostip.nip.io
 sed "s/IPADDR/$hostip/g" < ./chapter14/example-apps/tekton/tekton-task3.yaml  > /tmp/tekton-task3.yaml
 kubectl apply -f /tmp/tekton-task3.yaml
@@ -587,14 +588,30 @@ kubectl apply -f /tmp/tekton-task3.yaml
 kubectl -n python-hello-build  get tasks
 ```
 8. Add *chapter14/example-apps/tekton/tekton-pipeline.yaml* to your cluster.
+```bash
+kubectl apply -f chapter14/example-apps/tekton/tekton-pipeline.yaml
+kubectl -n python-hello-build  get pipelines
+```
 9. Add *chapter14/example-apps/tekton/tekton-pipeline-run.yaml* to your cluster.
-
+```bash
+kubectl apply -f chapter14/example-apps/tekton/tekton-pipeline-run.yaml
+kubectl -n python-hello-build  get pipelines
+```
 You can check on the progress of your pipeline using **kubectl**, or you can use Tekton's CLI tool called ``tkn`` (https://github.com/tektoncd/cli). Running ``tkn pipelinerun describe build-hello-pipeline-run -n python-hello-build`` will list out the progress of your build. You can rerun the build by recreating your ``run`` object, but that's not very efficient. Besides, what we really want is for our pipeline to run on a commit!
-
+```bash
+kubectl delete -f chapter14/example-apps/tekton/tekton-pipeline-run.yaml
+kubectl apply -f chapter14/example-apps/tekton/tekton-pipeline-run.yaml
+kubectl -n python-hello-build  get pipelines
+tkn pipelinerun describe build-hello-pipeline-run -n python-hello-build
+```
 ### Building automatically
 We don't want to manually run builds. We want builds to be automated. Tekton provides the trigger project to provide webhooks so that whenever GitLab receives a commit, it can tell Tekton to build a **PipelineRun** object for us. Setting up a trigger involves creating a Pod, with its own service account that can create **PipelineRun** objects, a Service for that Pod, and an **Ingress** object to host HTTPS access to the Pod. You also want to protect the webhook with a secret so that it isn't triggered inadvertently. Let's deploy these objects to our cluster:
 
 1. Add *chapter14/example-apps/tekton/tekton-webhook-cr.yaml* to your cluster. This **ClusterRole** will be used by any namespace that wants to provision webhooks for builds.
+```bash
+kubectl apply -f ./chapter14/example-apps/tekton/tekton-webhook-cr.yaml
+kubectl  get clusterroles  tekton-triggers-gitlab-minimal tekton-triggers-gitlab-cluster-minimal
+```
 1. Edit *chapter14/example-apps/tekton/tekton-webhook.yaml*. At the bottom of the file is an **Ingress** object. Change *192-168-18-24* to represent the IP of your cluster, with dashes instead of dots. Then, add the file to your cluster:
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -606,7 +623,7 @@ metadata:
     cert-manager.io/cluster-issuer: ca-issuer
 spec:
   rules:
-  - host: "python-hello-application.build.192-168-18-24.nip.io"
+  - host: "python-hello-application.build.IPADDR.nip.io"
     http:
       paths:
       - backend:
@@ -618,19 +635,42 @@ spec:
         path: "/"
   tls:
   - hosts:
-    - "python-hello-application.build.192-168-2-114.nip.io"
+    - "python-hello-application.build.IPADDR.nip.io"
     secretName: ingresssecret
 ```
-3. Log in to GitLab. Go to **Admin Area** | **Network**. Click on **Expand** next to **Outbound Requests**. Check the **Allow requests to the local network from web hooks and services** option and click **Save changes**.
-4. Go to the *hello-python* project we created and click on **Settings** | **Webhooks**. For the URL, use your *Ingress* host with HTTPS – for instance,*https://python-hello-application.build.192-168-18-24.nip.io/*. For **Secret Token**, use *notagoodsecret*, and for **Push events**, set the branch name to *main*. Finally, click on **Add webhook**.
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+sed "s/IPADDR/$hostip/g" < ./chapter14/example-apps/tekton/tekton-webhook.yaml  > /tmp/tekton-webhook.yaml
+kubectl apply -f /tmp/tekton-webhook.yaml
+kubectl -n python-hello-build  get ing
+```
+or
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+sed "s/192-168-2-119/$hostip/g" < ./chapter14/example-apps/tekton/tekton-webhook.yaml  > /tmp/tekton-webhook.yaml
+kubectl apply -f /tmp/tekton-webhook.yaml
+kubectl -n python-hello-build  get ing
+```
+
+3. Log in to GitLab. Go to **Admin Area** | **Settings**  | **Network**. Click on **Expand** next to **Outbound Requests**. Check the **Allow requests to the local network from web hooks and services** option and click **Save changes**.
+```
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g') 
+echo https://gitlab.apps.$hostip.nip.io/
+```
+4. Go to the ``hello-python`` project we created and click on **Settings** | **Webhooks**. For the URL, use your *Ingress* host with HTTPS – for instance,*https://python-hello-application.build.192-168-18-24.nip.io/*. For **Secret Token**, use *notagoodsecret*, and for **Push events**, set the branch name to *main*. Finally, click on **Add webhook**.
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g') 
+echo https://python-hello-application.build.$hostip.nip.io/
+```
+
 5. Once added, click on **Test**, choosing **Push Events**. If everything is configured correctly, a new *PipelineRun* object should have been created. You can run ``tkn pipelinerun list -n python-hello-build`` to see the list of runs; there should be a new one running. After a few minutes, you'll have a new container and a patched Deployment in the *python-hello-operations* project!
 
 We covered quite a bit in this section to build our application and deploy it using GitOps. The good news is that everything is automated; a push will create a new instance of our application! The bad news is that we had to create over a dozen Kubernetes objects and manually make updates to our projects in GitLab. In the last section, we'll automate this process. First, let's deploy ArgoCD so that we can get our application running!
 
 ## Deploying ArgoCD
-So far, we have a way to get into our cluster, a way to store code, and a system for building our code and generating images. The last component of our platform is our GitOps controller. This is the piece that lets us commit manifests to our Git repository and make changes to our cluster. ArgoCD is a tool from Intuit that provides a great UI and is driven by a combination of custom resources and Kubernetes-native ConfigMap and Secret objects. It has a CLI tool, and both the web and CLI tools are integrated with OpenID Connect, so it will be easy to add SSO with OpenUnison.
+So far, we have a way to get into our cluster, a way to store code, and a system for building our code and generating images. The last component of our platform is our GitOps controller. This is the piece that lets us commit manifests to our Git repository and make changes to our cluster. ArgoCD is a tool from Intuit that provides a great UI and is driven by a combination of custom resources and Kubernetes-native ``ConfigMap`` and ``Secret`` objects. It has a CLI tool, and both the web and CLI tools are integrated with OpenID Connect, so it will be easy to add SSO with OpenUnison.
 
-Let's deploy ArgoCD and use it to launch our hello-python web service:
+Let's deploy ArgoCD and use it to launch our ``hello-python`` web service:
 
 1. Deploy using the standard YAML from https://argo-cd.readthedocs.io/en/stable/:
 ```bash
@@ -639,14 +679,14 @@ $ kubectl apply -f chapter14/argocd/argocd-policy.yaml
 $ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 ```
 
-2. Create the Ingress object for ArgoCD by running chapter14/deploy-argocd-ingress.sh. This script sets the IP in the hostname correctly and adds the ingress objects to the cluster.
-3. Get the root password by running kubectl get secret argocd-initial-admin-secret -n argocd -o json | jq -r '.data.password' | base64 -d. Save this password.
+2. Create the ``Ingress`` object for ArgoCD by running ``chapter14/deploy-argocd-ingress.sh``. This script sets the IP in the hostname correctly and adds the ingress objects to the cluster.
+3. Get the root password by running ``kubectl get secret argocd-initial-admin-secret -n argocd -o json | jq -r '.data.password' | base64 -d``. Save this password.
 4. We need to tell ArgoCD to run as a user and group 999 so our default mutation doesn't assign a user of 1000 and a group of 2000 to make sure SSH keys are read properly. Run the following patches:
 ```bash
 $ kubectl patch deployment argocd-server -n argocd -p '{"spec":{"template":{"spec":{"containers":[{"name":"argocd-server","securityContext":{"runAsUser":999,"runAsGroup":999}}]}}}}}'
 $ kubectl patch deployment argocd-repo-server  -n argocd -p '{"spec":{"template":{"spec":{"containers":[{"name":"argocd-repo-server","securityContext":{"runAsUser":999,"runAsGroup":999}}]}}}}}'
 ```
-5. Edit the argocd-server Deployment in the argocd namespace. Add --insecure to the command:
+5. Edit the ``argocd-server`` **Deployment** in the ``argocd`` namespace. Add ``--insecure`` to the command:
 ```yaml
     spec:
       containers:
@@ -656,25 +696,36 @@ $ kubectl patch deployment argocd-repo-server  -n argocd -p '{"spec":{"template"
         - argocd-repo-server:8081
         - --insecure
 ```
-6. You can now log in to ArgoCD by going to the Ingress host you defined in step 2. You will need to download the ArgoCD CLI utility as well from https://github.com/argoproj/argo-cd/releases/latest. Once downloaded, log in by running ./argocd login grpc-argocd.apps.192-168-2-114.nip.io, replacing 192-168-2-114 with the IP of your server, and with dashes instead of dots.
+6. You can now log in to ArgoCD by going to the ``Ingress`` host you defined in ***step 2***. You will need to download the ArgoCD CLI utility as well from https://github.com/argoproj/argo-cd/releases/latest. Once downloaded, log in by running ``./argocd login grpc-argocd.apps.192-168-2-114.nip.io``, replacing ``192-168-2-114`` with the IP of your server, and with dashes instead of dots.
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+./argocd login grpc-argocd.apps.$hostip.nip.io
+```
 7. Create the python-hello namespace.
-8. Add chapter14/yaml/python-hello-policy.yaml to your cluster so we can run our service under strict security policies. We don't need a privileged container so why run with one?
-9. Before we can add our GitLab repository, we need to tell ArgoCD to trust our GitLab instance's SSH host. Since we will have ArgoCD talk directly to the GitLab shell service, we'll need to generate known_host for that Service. To make this easier, we included a script that will run known_host from outside the cluster but rewrite the content as if it were from inside the cluster. Run the chapter14/shell/getSshKnownHosts.sh script and pipe the output into the argocd command to import known_host. Remember to change the hostname to reflect your own cluster's IP address:
+```bash
+kubectl  create  namespace python-hello
+```
+8. Add *chapter14/yaml/python-hello-policy.yaml* to your cluster so we can run our service under strict security policies. We don't need a privileged container so why run with one?
+```bash
+kubectl apply -f chapter14/yaml/python-hello-policy.yaml
+```
+
+9. Before we can add our GitLab repository, we need to tell ArgoCD to trust our GitLab instance's SSH host. Since we will have ArgoCD talk directly to the GitLab shell service, we'll need to generate ``known_host`` for that Service. To make this easier, we included a script that will run ``known_host`` from outside the cluster but rewrite the content as if it were from inside the cluster. Run the **chapter14/shell/getSshKnownHosts.sh** script and pipe the output into the ``argocd`` command to import ``known_host``. Remember to change the hostname to reflect your own cluster's IP address:
 ```bash
 $ ./chapter14/argocd/getSshKnownHosts.sh gitlab.apps.192-168-2-114.nip.io | argocd cert add-ssh --batch
 Enter SSH known hosts entries, one per line. Press CTRL-D when finished.
 Successfully created 3 SSH known host entries
 ```
-10. Next, we need to generate an SSH key to access the python-hello-operations repository:
+10. Next, we need to generate an SSH key to access the ``python-hello-operations`` repository:
 ```bash
 $ ssh-keygen -t rsa -m PEM -f ./argocd-python-hello
 ```
-11. In GitLab, add the public key to the python-hello-operations repository by going to the project and clicking on Settings | Repository. Next to Deploy Keys, click Expand. For Title, use argocd. Use the contents of argocd-python-hello.pub and click Add key. Then, add the key to ArgoCD using the CLI and replace the public GitLab host with the gitlab-gitlab-shell Service hostname:
+11. In GitLab, add the public key to the ``python-hello-operations`` repository by going to the project and clicking on **Settings** | **Repository**. Next to **Deploy Keys**, click **Expand**. For **Title**, use ``argocd``. Use the contents of ``argocd-python-hello.pub`` and click **Add key**. Then, add the key to ArgoCD using the CLI and replace the public GitLab host with the ``gitlab-gitlab-shell`` ``Service`` hostname:
 ```bash
 $ argocd repo add git@gitlab-gitlab-shell.gitlab.svc.cluster.local:root/hello-python-operations.git --ssh-private-key-path ./argocd-python-hello
 repository 'git@gitlab-gitlab-shell.gitlab.svc.cluster.local:root/hello-python-operations.git' added
 ```
-12. Our last step is to create an Application object. You can create it through the web UI or the CLI. You can also create it by creating an Application object in the argocd namespace, which is what we'll do. Create the following object in your cluster (chapter14/example-apps/argocd/argocd-python-hello.yaml):
+12. Our last step is to create an ``Application`` object. You can create it through the web UI or the CLI. You can also create it by creating an ``Application`` object in the ``argocd`` namespace, which is what we'll do. Create the following object in your cluster (**chapter14/example-apps/argocd/argocd-python-hello.yaml**):
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -696,7 +747,7 @@ spec:
   syncPolicy:
     automated: {}
 ```
-This is about as basic a configuration as is possible. We're working off simple manifests. ArgoCD can work from JSONnet and Helm too. After this application is created, look at the Pods in the python-hello namespace. You should have one running! Making updates to your code will result in updates to the namespace.
+This is about as basic a configuration as is possible. We're working off simple manifests. ArgoCD can work from JSONnet and Helm too. After this application is created, look at the Pods in the ``python-hello`` namespace. You should have one running! Making updates to your code will result in updates to the namespace.
 
 We now have a code base that can be deployed automatically with a commit. We spent two dozen pages, ran dozens of commands, and created more than 20 objects to get there. Instead of manually creating these objects, it would be best to automate the process. Now that we have the objects that need to be created, we can automate the onboarding. In the next section, we will take the manual process of building the links between GitLab, Tekton, and ArgoCD to line up with our business processes.
 
