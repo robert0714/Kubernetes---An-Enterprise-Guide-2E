@@ -45,8 +45,11 @@ kubectl create ns openunison
 helm repo add tremolo https://nexus.tremolo.io/repository/helm/
 helm repo update
 helm install openunison tremolo/openunison-operator --namespace openunison
+
 while [[ $(kubectl get pods -l app=openunison-operator -n openunison -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do echo "waiting for operator pod" && sleep 1; done
+
 kubectl create -f chapter5/myvd-book.yaml
+
  ``` 
 2. Once the operator has been deployed, we need to create a secret that will store passwords used internally by OpenUnison. Make sure to use your own values for the keys in this secret (remember to Base64-encode them):
 ```bash 
@@ -61,6 +64,7 @@ data:
    unisonKeystorePassword: cGFzc3dvcmQK
    AD_BIND_PASSWORD: c3RhcnQxMjM=
 kind: Secret
+EOF
 ```
 
 3. To deploy OpenUnison using your openunison-values.yaml file, execute a helm install command that uses the -f option to specify the openunison-values.yaml file:
@@ -77,11 +81,19 @@ helm show values tremolo/orchestra  --version   2.5.0   > openunison-values-toda
 
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
 
-sed "s/IPADDR/$hostip/g" < ./openunison-values-20220104.yaml  > /tmp/openunison-values.yaml
+sed "s/IPADDR/$hostip/g" < ./chapter5/openunison-values-20220104.yaml  > /tmp/openunison-values.yaml
 
-helm install orchestra tremolo/orchestra --namespace openunison -f ./chapter5/openunison-values-20220104.yaml
+helm install orchestra tremolo/orchestra --namespace openunison -f /tmp/openunison-values.yaml
 
-helm install orchestra-login-portal tremolo/orchestra-login-portal --namespace openunison -f ./chapter5/openunison-values-20220104.yaml
+while [[ $(kubectl get pods -l app=openunison-orchestra -n openunison -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do echo "waiting for orchestra to be running" && sleep 1; done
+
+echo "Sleeping for 10 seconds to let openunison catch up...."
+
+sleep 10s
+
+echo "Deploying the login portal"
+
+helm install orchestra-login-portal tremolo/orchestra-login-portal --namespace openunison -f /tmp/openunison-values.yaml
 ```
 4. The first command extracts OpenUnison's TLS certificate from its secret. This is the same secret referenced by OpenUnison's Ingress object. We use the jq utility to extract the data from the secret and then Base64-decode it:
 ```bash                   
