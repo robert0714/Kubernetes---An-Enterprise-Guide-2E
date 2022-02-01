@@ -75,6 +75,10 @@ helm show readme tremolo/orchestra  --version   2.5.0
 
 helm show values tremolo/orchestra  --version   2.5.0   > openunison-values-today.yaml
 
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+
+sed "s/IPADDR/$hostip/g" < ./openunison-values-20220104.yaml  > /tmp/openunison-values.yaml
+
 helm install orchestra tremolo/orchestra --namespace openunison -f ./chapter5/openunison-values-20220104.yaml
 
 helm install orchestra-login-portal tremolo/orchestra-login-portal --namespace openunison -f ./chapter5/openunison-values-20220104.yaml
