@@ -39,7 +39,8 @@ helm show values  tremolo/orchestra-login-portal
  but steps:
 1.  Creating Clusters 
 ```bash
- ./chpter2/create-cluster.sh
+ch chpter2
+./create-cluster.sh
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.4.0/aio/deploy/recommended.yaml
 kubectl create ns openunison
 helm repo add tremolo https://nexus.tremolo.io/repository/helm/
