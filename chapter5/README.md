@@ -1,3 +1,26 @@
+# Chapter 5 Integrating Authentication into Your Cluster
+Once a cluster has been built, users will need to interact with it securely. For most enterprises, this means authenticating individual users and making sure they can only access what they need in order to do their jobs. With Kubernetes, this can be challenging because a cluster is a collection of APIs, not an application with a frontend that can prompt for authentication.
+
+In this chapter, you'll learn how to integrate enterprise authentication into your cluster using the OpenID Connect protocol and Kubernetes impersonation. We'll also cover several anti-patterns and explain why you should avoid using them.
+
+In this chapter, we will cover the following topics:
+
+* Understanding how Kubernetes knows who you are
+* Understanding OpenID Connect
+* Configuring KinD for OpenID Connect
+* How cloud Kubernetes knows who you are
+* Configuring your cluster for impersonation
+* Configuring impersonation without OpenUnison
+* Authenticating pipelines to your cluster
+
+Let's get started!
+
+## Technical requirements
+To complete the exercises in this chapter, you will require the following:
+
+* An Ubuntu 20.04 server with 8 GB of RAM
+* A KinD cluster running with the configuration from Chapter 2, Deploying Kubernetes Using KinD
+
 # Configuring KinD for OpenID Connect
 ## Addressing the requirements
 It work! 
@@ -39,10 +62,22 @@ data:
    AD_BIND_PASSWORD: c3RhcnQxMjM=
 kind: Secret
 ```
+
 3. To deploy OpenUnison using your openunison-values.yaml file, execute a helm install command that uses the -f option to specify the openunison-values.yaml file:
 ```bash
- helm install orchestra tremolo/orchestra --namespace openunison -f ./chapter5/openunison-values-20220104.yaml
- helm install orchestra-login-portal tremolo/orchestra-login-portal --namespace openunison -f ./chapter5/openunison-values-20220104.yaml
+helm search hub orchestra  --max-col-width=0
+URL                                                                                     CHART VERSION   APP VERSION     DESCRIPTION
+https://artifacthub.io/packages/helm/tremolo/orchestra                                  2.5.0           1.0.24          A Helm chart for Kubernetes
+
+helm show chart tremolo/orchestra  --version   2.5.0
+
+helm show readme tremolo/orchestra  --version   2.5.0
+
+helm show values tremolo/orchestra  --version   2.5.0   > openunison-values-today.yaml
+
+helm install orchestra tremolo/orchestra --namespace openunison -f ./chapter5/openunison-values-20220104.yaml
+
+helm install orchestra-login-portal tremolo/orchestra-login-portal --namespace openunison -f ./chapter5/openunison-values-20220104.yaml
 ```
 4. The first command extracts OpenUnison's TLS certificate from its secret. This is the same secret referenced by OpenUnison's Ingress object. We use the jq utility to extract the data from the secret and then Base64-decode it:
 ```bash                   

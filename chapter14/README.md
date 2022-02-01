@@ -183,6 +183,8 @@ We defined the fact that each project we deploy will have three "roles" that wil
 
 To facilitate OpenUnison's automation capabilities, we need to deploy a database to store persistent data and an SMTP server to notify users when they have open requests or when requests have been completed. For the database, we'll deploy the open source MariaDB. For a **Simple Mail Transfer Protocol (SMTP)** (email) server, most enterprises have very strict rules about sending emails. We don't want to have to worry about getting email set up for notifications, so we'll run a "black hole" email service that just disregards all SMTP requests.
 
+[Reference](https://openunison.github.io/namespace_as_a_service/)
+
 Don't worry about having to go back through previous chapters to get OpenUnison and GateKeeper up and running. We created two scripts to build everything out for you:
 ```bash
 $ .
