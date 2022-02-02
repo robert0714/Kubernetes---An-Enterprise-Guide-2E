@@ -978,9 +978,54 @@ Once the ``openunison-orchestra`` Pod is running again, log in to OpenUnison by 
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g') 
 echo https://k8sou.apps.$hostip.nip.io/
 ```
-
-
 Use the username ``mmosley`` and the password ``start123``. You'll notice that we have several new badges besides tokens and the dashboard.
+```bash
+[2022-02-02 16:16:56,641][XNIO-1 task-2] INFO  PrintUserInfo - pre-map-gitlab - mmosley - {sub=sub : 'mmosley' , firstName=firstName : 'Matt' , lastName=lastName : 'Mosley' , mail=mail : 'mmosley@tremolo.dev' } / [users, k8s-cluster-k8s-administrators, users, users, k8s-cluster-k8s-administrators]
+[2022-02-02 16:16:56,662][XNIO-1 task-2] INFO  PrintUserInfo - pre-provision-gitlab - mmosley - {name=name : 'Matt Mosley' , isAdmin=isAdmin : 'true' , email=email : 'mmosley@tremolo.dev' , username=username : 'mmosley' } / [users, k8s-cluster-k8s-administrators, users, users, k8s-cluster-k8s-administrators]
+[2022-02-02 16:16:57,191][XNIO-1 task-2] ERROR JITAuthMech - Could not execute workflow 'jitdb' on 'cn=mmosley,ou=Users,ou=activedirectory,o=Data'com.tremolosecurity.provisioning.core.ProvisioningException: Could not load user
+        at com.tremolosecurity.unison.gitlab.provisioning.targets.GitlabUserProvider.findUserByName(GitlabUserProvider.java:566) ~[unison-applications-gitlab-1.0.25.jar:?]
+        at com.tremolosecurity.unison.gitlab.provisioning.targets.GitlabUserProvider.findUser(GitlabUserProvider.java:446) ~[unison-applications-gitlab-1.0.25.jar:?]
+        at com.tremolosecurity.unison.gitlab.provisioning.targets.GitlabUserProvider.syncUser(GitlabUserProvider.java:238) ~[unison-applications-gitlab-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.core.ProvisioningTargetImpl.syncUser(ProvisioningTargetImpl.java:107) ~[unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.tasks.Provision.doTask(Provision.java:113) ~[unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.core.WorkflowTaskImpl.runSubTasks(WorkflowTaskImpl.java:165) ~[unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.tasks.Mapping.doTask(Mapping.java:67) ~[unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.core.WorkflowTaskImpl.runSubTasks(WorkflowTaskImpl.java:165) ~[unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.tasks.CallWorkflow.doTask(CallWorkflow.java:73) ~[unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.core.WorkflowTaskImpl.runSubTasks(WorkflowTaskImpl.java:165) ~[unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.tasks.Mapping.doTask(Mapping.java:67) ~[unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.core.WorkflowImpl.executeWorkflow(WorkflowImpl.java:257) ~[unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.core.WorkflowImpl.executeWorkflow(WorkflowImpl.java:151) ~[unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.core.WorkflowImpl.executeWorkflow(WorkflowImpl.java:544) ~[unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.auth.JITAuthMech.doGet(JITAuthMech.java:126) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.provisioning.auth.JITAuthMech.doPost(JITAuthMech.java:75) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.sys.AuthManagerImpl.execAuth(AuthManagerImpl.java:454) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.sys.AuthManagerImpl.nextAuth(AuthManagerImpl.java:134) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.sys.AuthManagerImpl.nextAuth(AuthManagerImpl.java:88) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.FullMappingAuthMech.doGet(FullMappingAuthMech.java:85) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.FullMappingAuthMech.doPost(FullMappingAuthMech.java:92) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.sys.AuthManagerImpl.execAuth(AuthManagerImpl.java:454) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.sys.AuthManagerImpl.nextAuth(AuthManagerImpl.java:134) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.sys.AuthManagerImpl.nextAuth(AuthManagerImpl.java:88) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.FormLoginAuthMech.doPost(FormLoginAuthMech.java:217) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.AuthMgrSys.doAuthMgr(AuthMgrSys.java:198) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.embedd.NextEmbSys.nextSys(NextEmbSys.java:126) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.AzSys.doAz(AzSys.java:89) [unison-sdk-1.0.25.jar:?]
+        at com.tremolosecurity.embedd.NextEmbSys.nextSys(NextEmbSys.java:111) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.auth.AuthSys.doAuth(AuthSys.java:88) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.embedd.NextEmbSys.nextSys(NextEmbSys.java:105) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.proxy.ConfigSys.doConfig(ConfigSys.java:296) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.embedd.NextEmbSys.nextSys(NextEmbSys.java:93) [unison-server-core-1.0.25.jar:?]
+        at com.tremolosecurity.filter.UnisonServletFilter.doFilter(UnisonServletFilter.java:299) [unison-server-core-1.0.25.jar:?]       
+Caused by: org.gitlab4j.api.GitLabApiException: 400 Bad Request: invalid header value
+        at org.gitlab4j.api.AbstractApi.validate(AbstractApi.java:633) ~[gitlab4j-api-4.19.0.jar:?]
+        at org.gitlab4j.api.AbstractApi.get(AbstractApi.java:213) ~[gitlab4j-api-4.19.0.jar:?]
+        at org.gitlab4j.api.Pager.<init>(Pager.java:92) ~[gitlab4j-api-4.19.0.jar:?]
+        at org.gitlab4j.api.UserApi.findUsers(UserApi.java:464) ~[gitlab4j-api-4.19.0.jar:?]
+        at org.gitlab4j.api.UserApi.findUsers(UserApi.java:428) ~[gitlab4j-api-4.19.0.jar:?]
+        at com.tremolosecurity.unison.gitlab.provisioning.targets.GitlabUserProvider.findUserByName(GitlabUserProvider.java:540) ~[unison-applications-gitlab-1.0.25.jar:?]
+        ... 68 more
+```
 
 ![OpenUnison NaaS portal](images/B17950_14_10.png)  
 Figure 14.10: OpenUnison NaaS portal
