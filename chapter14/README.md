@@ -67,7 +67,7 @@ The steps to deploy **cert-manager** are as follows:
 
 1. From your cluster, deploy the cert-manager manifests:
 ```bash
-$ kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.yaml
+$ kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.2/cert-manager.yaml
 ```
 2. There is now an SSL directory with a certificate and a key. The next step is to create a secret from these files that will become our certificate authority:
 ```bash
@@ -120,6 +120,7 @@ With **cert-manager** ready to issue certificates and both your cluster and your
 ### Deploying the Docker container registry
 Docker, Inc. provides a simple registry. There is no security on this registry, so it is most certainly not a good option for production use. The **chapter14/docker-registry/docker-registry.yaml** file will deploy the registry for us and create an **Ingress** object. The **chapter14/docker-registry/deploy-docker-registry.sh** script will deploy the registry for you:
 ```bash
+$ cd chapter14/docker-registry
 $ ./deploy-docker-registry.sh
 namespace/docker-registry created
 k8spsphostfilesystem.constraints.gatekeeper.sh/docker-registry-host-filesystem unchanged
@@ -187,7 +188,7 @@ To facilitate OpenUnison's automation capabilities, we need to deploy a database
 
 Don't worry about having to go back through previous chapters to get OpenUnison and GateKeeper up and running. We created two scripts to build everything out for you:
 ```bash
-$ .
+$ cd ../gatekeeper
 $ ./deploy_gatekeeper.sh
 .
 .
@@ -226,14 +227,14 @@ $ kubectl create secret generic \
   internal-ca --from-file=/tmp/gitlab-secret/ -n gitlab
 ```
 
-3. Deploy a Secret for GitLab that configures its OpenID Connect provider to use OpenUnison for authentication:
+3. Deploy a ``Secret`` for GitLab that configures its OpenID Connect provider to use OpenUnison for authentication:
 ```bash
 $ cd chapter14/gitlab/sso-secret
 $ ./deploy-gitlab-secret.sh
 secret/gitlab-oidc created
 ```
 
-4. This **Secret** needs to be created before deploying the Helm chart because, just as with OpenUnison, you shouldn't keep secrets in your charts, even if they're encrypted. Here's what the base64-decoded data from the secret will look like once created:
+4. This ``Secret`` needs to be created before deploying the Helm chart because, just as with OpenUnison, you shouldn't keep secrets in your charts, even if they're encrypted. Here's what the base64-decoded data from the secret will look like once created:
 ```yaml
 // kubectl -n gitlab get secret gitlab-oidc -o json | jq -r '.data.provider' |base64 -d
 name: openid_connect
@@ -256,9 +257,9 @@ args:
 ```
 
 > **⚠ ATTENTION:**
-> We're using a client secret of secret. This should not be done for a production cluster. If you're deploying GitLab into production using our templates as a starting point, make sure to change this.
+> We're using a client secret of ``secret``. This should not be done for a production cluster. If you're deploying GitLab into production using our templates as a starting point, make sure to change this.
 
-5. If your cluster is running on a single VM, now would be a good time to create a snapshot. If something goes wrong during the GitLab deployment, it's easier to revert back to a snapshot since the Helm chart doesn't do a great job of cleaning up after itself on a delete.
+5. If your cluster is ``running on a single VM, now would be a good time to create a snapshot``. If something goes wrong during the GitLab deployment, it's easier to revert back to a snapshot since the Helm chart doesn't do a great job of cleaning up after itself on a delete.
 
 6. Add the chart to your local repository and deploy GitLab:
 ```bash
@@ -279,7 +280,7 @@ REVISION: 1
 
 7. It will take a few minutes to run. Even once the Helm chart has been installed, it can take 15–20 minutes for all the Pods to finish deploying.
 
-8. We next need to update our GitLab shell to accept SSH connections on port 2222. This way, we can commit code without having to worry about blocking SSH access to your KinD server. Run the following to patch the Deployment:
+8. We next need to update our GitLab shell to accept SSH connections on port ``2222``. This way, we can commit code without having to worry about blocking SSH access to your KinD server. Run the following to patch the ``Deployment``:
 ```bash
 kubectl patch deployments gitlab-gitlab-shell -n gitlab -p '{"spec":{"template":{"spec":{"containers":[{"name":"gitlab-shell","ports":[{"containerPort":2222,"protocol":"TCP","name":"ssh","hostPort":2222}]}]}}}}'
 ```
@@ -354,11 +355,11 @@ Tekton is the pipeline system we're using for our platform. Originally part of t
 The process of deploying Tekton is pretty straightforward. Tekton is a series of operators that look for the creation of custom resources that define a build pipeline. The deployment itself only takes a couple of **kubectl** commands:
 
 ```bash
-$ kubectl create ns tekton-pipelines
-$ kubectl create -f chapter14/yaml/tekton-pipelines-policy.yaml
-$ kubectl apply -f https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
-$ kubectl apply -f https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
-$ kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
+kubectl create ns tekton-pipelines
+kubectl create -f chapter14/yaml/tekton-pipelines-policy.yaml
+kubectl apply -f https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
+kubectl apply -f https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
+kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
 ```
 
 The first command deploys the base system needed to run Tekton pipelines. The second command deploys the components needed to build webhooks so that pipelines can be launched as soon as code is pushed. Once both commands are done and the Pods in the **tekton-pipelines** namespace are running, you're ready to start building a pipeline! We'll use our Python Hello World web service as an example.
@@ -379,7 +380,7 @@ We'll build our pipeline one object at a time. The first set of tasks is to crea
 $ ssh-keygen -t rsa -m PEM -f ./gitlab-hello-python
 ```
 2. Log in to GitLab and navigate to the *hello-python* project we created. Click on **Settings** | **Repository** | **Deploy Keys**, and click **Expand**. Use *tekton* as the title and paste the contents of the ***gitlab-hello-python.pub*** file you just created into the **Key** section. Keep **Write access allowed** ***unchecked*** and click **Add Key**.
-3. Next, create the *python-hello-build* namespace and the following secret. Replace the *ssh-privatekey* attribute with the Base64-encoded content of the *gitlab-hello-python* file we created in ***step 1***. The annotation is what tells Tekton which server to use this key with. The server name is the *Service* in the GitLab namespace:
+3. Next, create the *python-hello-build* namespace and the following secret. Replace the ``ssh-privatekey`` attribute with the Base64-encoded content of the ``gitlab-hello-python`` file we created in ***step 1***. The annotation is what tells Tekton which server to use this key with. The server name is the *Service* in the GitLab namespace:
 ```yaml
 // kubectl create namespace python-hello-build
 // kubectl -n python-hello-build apply -f  git-pull.yaml
@@ -401,7 +402,7 @@ type: kubernetes.io/ssh-auth
 $ ssh-keygen -t rsa -m PEM -f ./gitlab-hello-python-operations
 ```
 5. Log in to GitLab and navigate to the *hello-python-operations* project we created. Click on **Settings** | **Repository** | **Deploy Keys**, and click **Expand**. Use *tekton* as the title and paste the contents of the ***gitlab-hello-python-operations.pub*** file you just created into the **Key** section. Make sure **Write access allowed** is ***checked*** and click **Add Key**.
-6. Next, create the following secret. Replace the *ssh-privatekey* attribute with the Base64-encoded content of the *gitlab-hello-python-operations* file we created in ***step 4***. The annotation is what tells Tekton which server to use this key with. The server name is the **Service** we created in ***step 6*** in the GitLab namespace:
+6. Next, create the following secret. Replace the ``ssh-privatekey`` attribute with the Base64-encoded content of the ``gitlab-hello-python-operations`` file we created in ***step 4***. The annotation is what tells Tekton which server to use this key with. The server name is the **Service** we created in ***step 6*** in the GitLab namespace:
 ```yaml
 // kubectl create namespace python-hello-build
 // kubectl -n python-hello-build apply -f  git-write.yaml
@@ -547,27 +548,17 @@ kubectl -n python-hello-build  get pipelineresources
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
 sed "s/IPADDR/$hostip/g" < ./chapter14/example-apps/tekton/tekton-image-result.yaml  > /tmp/tekton-image-result.yaml
 kubectl apply -f /tmp/tekton-image-result.yaml
+kubectl -n python-hello-build  get pipelineresources
 ```
-or
-```bash
-export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-sed "s/192-168-2-114/$hostip/g" < ./chapter14/example-apps/tekton/tekton-image-result.yaml  >  /tmp/tekton-image-result.yaml
-kubectl apply -f /tmp/tekton-image-result.yaml
-```
+ 
 5. Edit *chapter14/example-apps/tekton/tekton-task1.yaml*, replacing the image host with the host for your Docker registry, and add the file to your cluster.
 ```bash
-export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-echo  https://docker.apps.$hostip.nip.io
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g') 
 sed "s/IPADDR/$hostip/g" < ./chapter14/example-apps/tekton/tekton-task1.yaml  > /tmp/tekton-task1.yaml
 kubectl apply -f /tmp/tekton-task1.yaml
+kubectl -n python-hello-build  get tasks
 ```
-or
-```bash
-export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-echo  https://docker.apps.$hostip.nip.io
-sed "s/192-168-2-114/$hostip/g" < ./chapter14/example-apps/tekton/tekton-task1.yaml  >  /tmp/tekton-task1.yaml
-kubectl apply -f /tmp/tekton-task1.yaml
-```
+ 
 6. Add *chapter14/example-apps/tekton/tekton-task2.yaml* to your cluster.
 ```bash
 kubectl apply -f chapter14/example-apps/tekton/tekton-task2.yaml
@@ -575,20 +566,12 @@ kubectl -n python-hello-build  get tasks
 ```
 7. Edit *chapter14/example-apps/tekton/tekton-task3.yaml*, replacing the image host with the host for your Docker registry, and add the file to your cluster.
 ```bash
-export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-echo  https://docker.apps.$hostip.nip.io
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g') 
 sed "s/IPADDR/$hostip/g" < ./chapter14/example-apps/tekton/tekton-task3.yaml  > /tmp/tekton-task3.yaml
 kubectl apply -f /tmp/tekton-task3.yaml
 kubectl -n python-hello-build  get tasks
 ```
-or
-```bash
-export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-echo  https://docker.apps.$hostip.nip.io
-sed "s/192-168-2-140/$hostip/g" < ./chapter14/example-apps/tekton/tekton-task3.yaml  > /tmp/tekton-task3.yaml
-kubectl apply -f /tmp/tekton-task3.yaml
-kubectl -n python-hello-build  get tasks
-```
+ 
 8. Add *chapter14/example-apps/tekton/tekton-pipeline.yaml* to your cluster.
 ```bash
 kubectl apply -f chapter14/example-apps/tekton/tekton-pipeline.yaml
@@ -646,13 +629,6 @@ sed "s/IPADDR/$hostip/g" < ./chapter14/example-apps/tekton/tekton-webhook.yaml  
 kubectl apply -f /tmp/tekton-webhook.yaml
 kubectl -n python-hello-build  get ing
 ```
-or
-```bash
-export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-sed "s/192-168-2-119/$hostip/g" < ./chapter14/example-apps/tekton/tekton-webhook.yaml  > /tmp/tekton-webhook.yaml
-kubectl apply -f /tmp/tekton-webhook.yaml
-kubectl -n python-hello-build  get ing
-```
 
 3. Log in to GitLab. Go to **Admin Area** | **Settings**  | **Network**. Click on **Expand** next to **Outbound Requests**. Check the **Allow requests to the local network from web hooks and services** option and click **Save changes**.
 ```
@@ -676,14 +652,15 @@ Let's deploy ArgoCD and use it to launch our ``hello-python`` web service:
 
 1. Deploy using the standard YAML from https://argo-cd.readthedocs.io/en/stable/:
 ```bash
-$ kubectl create namespace argocd
-$ kubectl apply -f chapter14/argocd/argocd-policy.yaml
-$ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl create namespace argocd
+kubectl apply -f chapter14/argocd/argocd-policy.yaml
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 ```
 
 2. Create the ``Ingress`` object for ArgoCD by running ``chapter14/argocd/deploy-argocd-ingress.sh``. This script sets the IP in the hostname correctly and adds the ingress objects to the cluster.
 ```bash
-./chapter14/argocd/deploy-argocd-ingress.sh
+cd  chapter14/argocd
+./deploy-argocd-ingress.sh
 ```
 3. Get the root password by running ``kubectl get secret argocd-initial-admin-secret -n argocd -o json | jq -r '.data.password' | base64 -d``. Save this password.
 ```bash
@@ -691,8 +668,8 @@ kubectl get secret argocd-initial-admin-secret -n argocd -o json | jq -r '.data.
 ```
 4. We need to tell ArgoCD to run as a user and group 999 so our default mutation doesn't assign a user of 1000 and a group of 2000 to make sure SSH keys are read properly. Run the following patches:
 ```bash
-$ kubectl patch deployment argocd-server -n argocd -p '{"spec":{"template":{"spec":{"containers":[{"name":"argocd-server","securityContext":{"runAsUser":999,"runAsGroup":999}}]}}}}}'
-$ kubectl patch deployment argocd-repo-server  -n argocd -p '{"spec":{"template":{"spec":{"containers":[{"name":"argocd-repo-server","securityContext":{"runAsUser":999,"runAsGroup":999}}]}}}}}'
+kubectl patch deployment argocd-server -n argocd -p '{"spec":{"template":{"spec":{"containers":[{"name":"argocd-server","securityContext":{"runAsUser":999,"runAsGroup":999}}]}}}}}'
+kubectl patch deployment argocd-repo-server  -n argocd -p '{"spec":{"template":{"spec":{"containers":[{"name":"argocd-repo-server","securityContext":{"runAsUser":999,"runAsGroup":999}}]}}}}}'
 ```
 5. Edit the ``argocd-server`` **Deployment** in the ``argocd`` namespace. Add ``--insecure`` to the command:
 ```yaml
@@ -709,7 +686,7 @@ $ kubectl patch deployment argocd-repo-server  -n argocd -p '{"spec":{"template"
 6. You can now log in to ArgoCD by going to the ``Ingress`` host you defined in ***step 2***. You will need to download the ArgoCD CLI utility as well from https://github.com/argoproj/argo-cd/releases/latest. Once downloaded (brew install argocd / choco install argocd-cli ), log in by running ``./argocd login grpc-argocd.apps.192-168-2-114.nip.io``, replacing ``192-168-2-114`` with the IP of your server, and with dashes instead of dots. 
 ```bash
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-./argocd login grpc-argocd.apps.$hostip.nip.io
+argocd login grpc-argocd.apps.$hostip.nip.io
 ```
 > Argocd's default username is ``admin`` . [reference](https://tanzu.vmware.com/developer/guides/argocd-gs/)
 7. Create the python-hello namespace.
@@ -882,7 +859,10 @@ args:
     redirect_uri: https://gitlab.apps.192-168-18-29.nip.io/users/auth/openid_connect/callback
 ```
 1. Log in to GitLab as root. Go to your user's profile area and click on **Access Tokens**. For **Name**, use ``openunison``. Leave **Expires** blank and check the API scope. Click **Create personal access token**. Copy and paste the token into a notepad or some other place. Once you leave this screen, you can't retrieve this token again.  
-
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
+curl --header "PRIVATE-TOKEN: $TOKEN"  https://gitlab.apps.$hostip.nip.io/api/v4/projects  |jq -r
+```
 2. Edit the ``orchestra-secrets-source`` Secret in the ``openunison`` namespace. Add two keys:
 ```yaml
 // kubectl -n openunison get secret  orchestra-secrets-source -o yaml
@@ -994,6 +974,11 @@ $ helm -n openunison upgrade orchestra tremolo/orchestra  -f /tmp/openunison-val
 
 ```
 Once the ``openunison-orchestra`` Pod is running again, log in to OpenUnison by going to ``https://k8sou.apps.192-168-18-29.nip.io/,`` replacing "192-168-18-29" with your own IP address, but with dashes instead of dots.
+```bash
+export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g') 
+echo https://k8sou.apps.$hostip.nip.io/
+```
+
 
 Use the username ``mmosley`` and the password ``start123``. You'll notice that we have several new badges besides tokens and the dashboard.
 
