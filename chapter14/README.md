@@ -174,7 +174,7 @@ sudo cp ca.crt  /etc/docker/certs.d/docker.apps.$hostip.nip.io:5000/ca.crt
 
 sudo cp ca.crt   /usr/local/share/ca-certificates/docker.apps.$hostip.nip.io.crt
 
-pdate-ca-certificates
+sudo update-ca-certificates
 ```
 
 ### Deploying OpenUnison and GateKeeper
@@ -986,6 +986,7 @@ echo https://k8sou.apps.$hostip.nip.io/
 Use the username ``mmosley`` and the password ``start123``. You'll notice that we have several new badges besides tokens and the dashboard.
 
 > Using gitlab4j-api-4.19.0.jar to call get method ecounter the problem (400 Bad Request: invalid header value)
+> [source code](https://github.com/TremoloSecurity/OpenUnison/tree/master/unison/open-unison-webapp)
 ```bash
 [2022-02-02 16:16:56,641][XNIO-1 task-2] INFO  PrintUserInfo - pre-map-gitlab - mmosley - {sub=sub : 'mmosley' , firstName=firstName : 'Matt' , lastName=lastName : 'Mosley' , mail=mail : 'mmosley@tremolo.dev' } / [users, k8s-cluster-k8s-administrators, users, users, k8s-cluster-k8s-administrators]
 [2022-02-02 16:16:56,662][XNIO-1 task-2] INFO  PrintUserInfo - pre-provision-gitlab - mmosley - {name=name : 'Matt Mosley' , isAdmin=isAdmin : 'true' , email=email : 'mmosley@tremolo.dev' , username=username : 'mmosley' } / [users, k8s-cluster-k8s-administrators, users, users, k8s-cluster-k8s-administrators]
