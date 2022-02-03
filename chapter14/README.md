@@ -270,7 +270,10 @@ $ ./gen-helm-values.sh
 $ helm repo add gitlab https://charts.gitlab.io
   "gitlab" has been added to your repositories
 $ helm repo update
-$ helm install gitlab gitlab/gitlab -n gitlab -f /tmp/gitlab-values.yaml
+
+$ helm show chart gitlab/gitlab  --version 5.4.2 |more
+
+$ helm install gitlab gitlab/gitlab -n gitlab -f /tmp/gitlab-values.yaml    --version 5.4.2 
 NAME: gitlab
 LAST DEPLOYED: Mon Sep 27 14:00:44 2021
 NAMESPACE: gitlab
@@ -419,10 +422,12 @@ type: kubernetes.io/ssh-auth
 ```
 7. Create a service account for tasks to run, as with our secret:
 ```bash
-$ kubectl create -f chapter14/example-apps/tekton/tekton-serviceaccount.yaml
+kubectl create -f chapter14/example-apps/tekton/tekton-serviceaccount.yaml
+
+kubectl -n  python-hello-build  get serviceaccounts  tekton-build -o yaml
 ```
 8. We need a container that contains both git and kubectl. We'll build chapter14/example-apps/docker/PatchRepoDockerfile and push it to our internal registry. Make sure to replace 192-168-2-114 with the hostname for your server's IP address:
-```bash
+
 ```bash
 export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
 echo  https://docker.apps.$hostip.nip.io
@@ -979,6 +984,8 @@ export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
 echo https://k8sou.apps.$hostip.nip.io/
 ```
 Use the username ``mmosley`` and the password ``start123``. You'll notice that we have several new badges besides tokens and the dashboard.
+
+> Using gitlab4j-api-4.19.0.jar to call get method ecounter the problem (400 Bad Request: invalid header value)
 ```bash
 [2022-02-02 16:16:56,641][XNIO-1 task-2] INFO  PrintUserInfo - pre-map-gitlab - mmosley - {sub=sub : 'mmosley' , firstName=firstName : 'Matt' , lastName=lastName : 'Mosley' , mail=mail : 'mmosley@tremolo.dev' } / [users, k8s-cluster-k8s-administrators, users, users, k8s-cluster-k8s-administrators]
 [2022-02-02 16:16:56,662][XNIO-1 task-2] INFO  PrintUserInfo - pre-provision-gitlab - mmosley - {name=name : 'Matt Mosley' , isAdmin=isAdmin : 'true' , email=email : 'mmosley@tremolo.dev' , username=username : 'mmosley' } / [users, k8s-cluster-k8s-administrators, users, users, k8s-cluster-k8s-administrators]
