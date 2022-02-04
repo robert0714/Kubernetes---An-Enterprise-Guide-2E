@@ -173,13 +173,16 @@ There are a few options to deploy Kiali, but we will use the most common install
 helm install --namespace istio-system --set auth.strategy="anonymous" --repo https://kiali.org/helm-charts kiali-server kiali-server  
 ```
 
-This will only deploy Kiali itself, it does not expose it for external access. We have created an Ingress manifest that will create an Ingress rule using the nip.io format we have used throughout the book. The manifest is located in the chapter12/kiali directory, called create-kiali-istio-objs.sh. Change your directory to chapter12/kiali to execute the script, which will create the VirtualService and Gateway objects for Kiali, using the name kiali.w.x.y.z.nip.io.
-
+This will only deploy Kiali itself, it does not expose it for external access. We have created an Ingress manifest that will create an Ingress rule using the ``nip.io`` format we have used throughout the book. The manifest is located in the ``chapter12/kiali`` directory, called ``create-kiali-istio-objs.sh``. Change your directory to ``chapter12/kiali`` to execute the script, which will create the VirtualService and Gateway objects for Kiali, using the name ``kiali.w.x.y.z.nip.io``.
+```bash
+cd chapter12/kiali
+./create-kiali-istio-objs.sh
+```
 Once the Ingress has been created, the script will display the URL to access the Kiali dashboard. For this example, the Docker host has the IP address 10.2.1.165.
 
 ```bash
-export hostip=$(hostname  -I | cut -f1 -d' ' | sed 's/[.]/-/g')
-curl -v http://kiali.$hostip.nip.io/  
+export hostip=$(hostname  -I | cut -f1 -d' ')
+echo  http://kiali.$hostip.nip.io/   
 ```
 The Kiali ingress rule has been created. You can open the UI using http://kiali.10.2.1.165.nip.io/.
 
@@ -206,7 +209,9 @@ kubectl label ns demo istio-injection=enabled
 kubectl create -f ./istio-manifests.yaml -n demo
 ```
 4. Next, we will deploy the Boutique application and required services
+```bash
 kubectl create -f ./kubernetes-manifests.yaml -n demo
+```
 5. Finally, to create the Gateway and VirtualService that will be used to access the Boutique application, execute the ``create-gw-vs.sh`` script
 ```bash
 ./create-gw-vs.sh

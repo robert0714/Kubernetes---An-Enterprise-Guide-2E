@@ -13,3 +13,19 @@ spec:
         protocol: HTTP
   selector:
     istio: ingressgateway
+---
+kind: Gateway
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: zipkin-gateway 
+  namespace: istio-system
+spec:
+  servers:
+    - hosts:
+        - zipkin.$hostip.nip.io
+      port:
+        name: http
+        number: 80
+        protocol: HTTP
+  selector:
+    istio: ingressgateway

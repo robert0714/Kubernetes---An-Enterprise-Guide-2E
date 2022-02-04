@@ -14,4 +14,20 @@ spec:
         port:
           number: 20001 
         host: kiali
-
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: zipkin-vs
+  namespace: istio-system
+spec:
+  hosts:
+  - zipkin.$hostip.nip.io
+  gateways:
+  - zipkin-gateway
+  http:
+  - route:
+    - destination:
+        port:
+          number: 9411 
+        host: zipkin
