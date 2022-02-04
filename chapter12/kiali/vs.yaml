@@ -18,16 +18,16 @@ spec:
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: zipkin-vs
+  name: jaeger-vs
   namespace: istio-system
 spec:
   hosts:
-  - zipkin.$hostip.nip.io
+  - jaeger.$hostip.nip.io
   gateways:
-  - zipkin-gateway
+  - jaeger-gateway
   http:
   - route:
     - destination:
         port:
-          number: 9411 
-        host: zipkin
+          number: 80 
+        host: tracing

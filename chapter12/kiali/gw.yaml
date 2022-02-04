@@ -17,12 +17,12 @@ spec:
 kind: Gateway
 apiVersion: networking.istio.io/v1alpha3
 metadata:
-  name: zipkin-gateway 
+  name: jaeger-gateway 
   namespace: istio-system
 spec:
   servers:
     - hosts:
-        - zipkin.$hostip.nip.io
+        - jaeger.$hostip.nip.io
       port:
         name: http
         number: 80
